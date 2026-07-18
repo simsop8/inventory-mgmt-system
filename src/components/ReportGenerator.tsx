@@ -1,7 +1,7 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { useProperty } from '../store/PropertyContext';
 import { SigField } from './SigField';
-import { shareOrDownload, isMobileDevice } from '../utils/share';
+import { shareOrDownload } from '../utils/share';
 import { useDragReorder } from '../utils/dragReorder';
 import { buildInventoryReportPDF } from '../utils/reports';
 
@@ -9,6 +9,8 @@ export const ReportGenerator: React.FC = () => {
   const { profile, isLocked, addSignature, deleteSignature, reorderRoomTo, updateItem, updateKey } = useProperty();
   const roomSeqRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const { dragId: roomSeqDragId, startDrag: startRoomSeqDrag, getRowStyle: getRoomSeqRowStyle } = useDragReorder(profile.rooms.length, reorderRoomTo);
+  const [generating, setGenerating] = useState(false);
+  const [preview, setPreview] = useState<{ url: string; filename: string; blob: Blob } | null>(null);
 
   const agents = profile.details.agents || [];
 
@@ -30,13 +32,28 @@ export const ReportGenerator: React.FC = () => {
     })),
   ];
 
+  // Generates the PDF into an in-app preview first — rather than immediately opening a
+  // share sheet / new tab — so there's a deliberate review step before anything leaves
+  // the app on iPhone/iPad (or anywhere else). The preview's own "Download / Share"
+  // button is what actually hands the file off, at the user's choice.
   const generatePDF = async () => {
-    // Must happen synchronously, before the `await buildInventoryReportPDF()` below breaks
-    // the user-gesture chain — otherwise iOS Safari's popup blocker silently swallows the
-    // preview tab. See utils/share.ts for the full explanation.
-    const previewWin = isMobileDevice() ? window.open('', '_blank') : null;
-    const { blob, filename } = await buildInventoryReportPDF(profile);
-    await shareOrDownload(blob, filename, 'application/pdf', previewWin);
+    setGenerating(true);
+    try {
+      const { blob, filename } = await buildInventoryReportPDF(profile);
+      const url = URL.createObjectURL(blob);
+      setPreview(prev => { if (prev) URL.revokeObjectURL(prev.url); return { url, filename, blob }; });
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const closePreview = () => {
+    setPreview(prev => { if (prev) URL.revokeObjectURL(prev.url); return null; });
+  };
+
+  const downloadPreview = async () => {
+    if (!preview) return;
+    await shareOrDownload(preview.blob, preview.filename, 'application/pdf');
   };
 
   return (
@@ -225,16 +242,31 @@ export const ReportGenerator: React.FC = () => {
 
       <div className="bg-white rounded-lg shadow p-4">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Generate Report</h2>
-        <p className="text-sm text-gray-600 mb-3">To save or load this property's data, use "Save Work" / "Load File" / "Saved Files" at the top of the page. To clear everything and start over, use "Reset" at the top of the page.</p>
-        <button onClick={generatePDF} className="flex items-center gap-3 p-4 bg-primary-50 rounded-lg hover:bg-primary-100 transition-colors text-left w-full sm:w-auto sm:min-w-[280px]">
+        <p className="text-sm text-gray-600 mb-3">To save or load this property's data, use "Save Work" / "Import File" / "Saved Files" at the top of the page. To clear everything and start over, use "Reset" at the top of the page.</p>
+        <button onClick={() => { void generatePDF(); }} disabled={generating} className="flex items-center gap-3 p-4 bg-primary-50 rounded-lg hover:bg-primary-100 transition-colors text-left w-full sm:w-auto sm:min-w-[280px] disabled:opacity-50 disabled:cursor-not-allowed">
           <span className="text-2xl">📄</span>
           <div>
-            <div className="font-semibold text-primary-700 text-base">Generate PDF Report</div>
+            <div className="font-semibold text-primary-700 text-base">{generating ? 'Generating…' : 'Preview PDF Report'}</div>
             <div className="text-sm text-primary-500">Printer-friendly A4 — signatures on every page</div>
           </div>
         </button>
       </div>
 
+      {preview && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-black/60">
+          <div className="bg-white px-4 py-3 shadow">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-semibold text-gray-900 text-base truncate">Inventory Report Preview</span>
+              <div className="flex items-center gap-2 shrink-0">
+                <button onClick={() => { void downloadPreview(); }} className="px-3 py-1.5 text-base font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700">Download / Share</button>
+                <button onClick={closePreview} aria-label="Close preview" className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-gray-700 text-xl leading-none">✕</button>
+              </div>
+            </div>
+            <p className="text-sm text-gray-600 mt-1">If the preview doesn't display on your device, tap Download / Share to open it directly.</p>
+          </div>
+          <iframe title="Inventory Report Preview" src={preview.url} className="flex-1 w-full bg-gray-100" />
+        </div>
+      )}
     </div>
   );
 };

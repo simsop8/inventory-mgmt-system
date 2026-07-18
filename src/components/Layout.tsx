@@ -5,7 +5,7 @@ import { addSavedFile, getAllSavedFiles, deleteSavedFile, renameSavedFile, type 
 import { listCloudFiles, upsertCloudFile, deleteCloudFile, renameCloudFile, type CloudFileEntry } from '../store/cloudFiles';
 import { listStaff, addStaff, removeStaff, isStaffAdmin, type StaffEntry } from '../store/staffAccess';
 import { listMyShares, addShare, removeShare, type ShareEntry } from '../store/fileShares';
-import { shareOrDownload, isMobileDevice } from '../utils/share';
+import { shareOrDownload } from '../utils/share';
 import { buildInventoryReportPDF, buildConditionReportPDF } from '../utils/reports';
 
 // A row in the "Saved Files" list, merged from the local IndexedDB library and
@@ -96,6 +96,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
   const [mergedFiles, setMergedFiles] = useState<MergedFileEntry[]>([]);
   const [backingUp, setBackingUp] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [generatingReport, setGeneratingReport] = useState(false);
+  const [reportPreview, setReportPreview] = useState<{ url: string; filename: string; blob: Blob } | null>(null);
   const [accountDialogOpen, setAccountDialogOpen] = useState(false);
   const [authSubmitting, setAuthSubmitting] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -277,32 +279,45 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
   };
 
   // These live in the header menu (not just the Report/Condition Report tabs) so a report
-  // can be generated from wherever you are, without switching tabs first.
+  // can be generated from wherever you are, without switching tabs first. Like both tabs'
+  // own "Generate" buttons, this opens an in-app preview rather than immediately sharing/
+  // downloading — a deliberate review step before anything leaves the app on iPhone/iPad.
+  // The preview's own "Download / Share" button is what actually hands the file off.
   const handleGenerateInventoryReport = async () => {
-    // Must happen synchronously, before the `await buildInventoryReportPDF()` below breaks
-    // the user-gesture chain — otherwise iOS Safari's popup blocker silently swallows the
-    // preview tab. See utils/share.ts for the full explanation.
-    const previewWin = isMobileDevice() ? window.open('', '_blank') : null;
+    setGeneratingReport(true);
     try {
       const { blob, filename } = await buildInventoryReportPDF(profile);
-      await shareOrDownload(blob, filename, 'application/pdf', previewWin);
+      const url = URL.createObjectURL(blob);
+      setReportPreview(prev => { if (prev) URL.revokeObjectURL(prev.url); return { url, filename, blob }; });
     } catch {
-      previewWin?.close();
       showToast("Couldn't generate the Inventory Report");
+    } finally {
+      setGeneratingReport(false);
     }
   };
 
   const handleGenerateConditionReport = async () => {
     if (profile.photos.length === 0) { showToast('No condition photos to include yet'); return; }
-    const previewWin = isMobileDevice() ? window.open('', '_blank') : null;
+    setGeneratingReport(true);
     try {
       const result = await buildConditionReportPDF(profile);
-      if (!result) { previewWin?.close(); showToast('No condition photos to include yet'); return; }
-      await shareOrDownload(result.blob, result.filename, 'application/pdf', previewWin);
+      if (!result) { showToast('No condition photos to include yet'); return; }
+      const url = URL.createObjectURL(result.blob);
+      setReportPreview(prev => { if (prev) URL.revokeObjectURL(prev.url); return { url, filename: result.filename, blob: result.blob }; });
     } catch {
-      previewWin?.close();
       showToast("Couldn't generate the Condition Report");
+    } finally {
+      setGeneratingReport(false);
     }
+  };
+
+  const closeReportPreview = () => {
+    setReportPreview(prev => { if (prev) URL.revokeObjectURL(prev.url); return null; });
+  };
+
+  const downloadReportPreview = async () => {
+    if (!reportPreview) return;
+    await shareOrDownload(reportPreview.blob, reportPreview.filename, 'application/pdf');
   };
 
   const handleSignOut = async () => {
@@ -646,6 +661,22 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
       {toast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white text-base px-4 py-2 rounded-lg shadow-lg pointer-events-none">
           {toast}
+        </div>
+      )}
+
+      {reportPreview && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-black/60">
+          <div className="bg-white px-4 py-3 shadow">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-semibold text-gray-900 text-base truncate">Report Preview</span>
+              <div className="flex items-center gap-2 shrink-0">
+                <button onClick={() => { void downloadReportPreview(); }} className="px-3 py-1.5 text-base font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700">Download / Share</button>
+                <button onClick={closeReportPreview} aria-label="Close preview" className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-gray-700 text-xl leading-none">✕</button>
+              </div>
+            </div>
+            <p className="text-sm text-gray-600 mt-1">If the preview doesn't display on your device, tap Download / Share to open it directly.</p>
+          </div>
+          <iframe title="Report Preview" src={reportPreview.url} className="flex-1 w-full bg-gray-100" />
         </div>
       )}
 
@@ -1041,15 +1072,17 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
                 </button>
               )}
               <button
-                onClick={handleGenerateInventoryReport}
-                className="px-3 py-1.5 text-base text-gray-700 bg-white border border-gray-400 rounded-lg hover:bg-gray-50 transition-colors"
+                onClick={() => { void handleGenerateInventoryReport(); }}
+                disabled={generatingReport}
+                className="px-3 py-1.5 text-base text-gray-700 bg-white border border-gray-400 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
                 title="Generate the Property Inventory Report PDF from wherever you are"
               >
                 Inventory Report
               </button>
               <button
-                onClick={handleGenerateConditionReport}
-                className="px-3 py-1.5 text-base text-gray-700 bg-white border border-gray-400 rounded-lg hover:bg-gray-50 transition-colors"
+                onClick={() => { void handleGenerateConditionReport(); }}
+                disabled={generatingReport}
+                className="px-3 py-1.5 text-base text-gray-700 bg-white border border-gray-400 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
                 title="Generate the Property Condition Report PDF from wherever you are"
               >
                 Condition Report
@@ -1116,13 +1149,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
                     )}
                     <div className="my-1 border-t border-gray-300" />
                     <button
-                      onClick={() => { setMenuOpen(false); handleGenerateInventoryReport(); }}
+                      onClick={() => { setMenuOpen(false); void handleGenerateInventoryReport(); }}
                       className="w-full text-left px-4 py-2.5 text-base text-gray-800 hover:bg-gray-50 transition-colors"
                     >
                       📄 Inventory Report
                     </button>
                     <button
-                      onClick={() => { setMenuOpen(false); handleGenerateConditionReport(); }}
+                      onClick={() => { setMenuOpen(false); void handleGenerateConditionReport(); }}
                       className="w-full text-left px-4 py-2.5 text-base text-gray-800 hover:bg-gray-50 transition-colors"
                     >
                       📄 Condition Report

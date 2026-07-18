@@ -17,6 +17,13 @@ jobs:
           node-version: 20
 
       - name: Install and build
+        env:
+          # Vite bakes VITE_* vars into the built JS at build time — without these
+          # here, the deployed site silently ships with cloud sync disabled, even
+          # though the source code and Supabase project are both fine. Add these
+          # two as repo secrets: Settings → Secrets and variables → Actions.
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
         run: |
           npm install
           npm run build

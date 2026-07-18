@@ -4,8 +4,8 @@ import { PROPERTY_TYPES } from '../types';
 import type { AgentInfo } from '../types';
 import { calcLeaseEndDate } from '../utils/date';
 
-const inputCls = 'w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500';
-const labelCls = 'block text-sm font-medium text-gray-700 mb-1';
+const inputCls = 'w-full border border-gray-400 rounded-md px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500';
+const labelCls = 'block text-base font-medium text-gray-800 mb-1';
 
 export const PropertyDetails: React.FC = () => {
   const { profile, isLocked, updateDetails, addLandlord, updateLandlord, removeLandlord, addTenant, updateTenant, removeTenant, addAgent, updateAgent, removeAgent } = useProperty();
@@ -66,9 +66,9 @@ export const PropertyDetails: React.FC = () => {
             <label className={labelCls}>Postal Code</label>
             <div className="relative">
               <input type="text" name="postalCode" value={details.postalCode} onChange={handlePostalChange} maxLength={6} placeholder="e.g. 123456" className={inputCls} />
-              {postalLoading && <span className="absolute right-3 top-2.5 text-xs text-gray-400 animate-pulse">Looking up...</span>}
+              {postalLoading && <span className="absolute right-3 top-2.5 text-sm text-gray-600 animate-pulse">Looking up...</span>}
             </div>
-            {postalError && <p className="text-xs text-red-500 mt-1">{postalError}</p>}
+            {postalError && <p className="text-sm text-red-500 mt-1">{postalError}</p>}
           </div>
           <div>
             <label className={labelCls}>Property Type</label>
@@ -108,26 +108,26 @@ export const PropertyDetails: React.FC = () => {
           </div>
           <div>
             <label className={labelCls}>
-              Lease End Date{details.leasePeriodMonths ? <span className="text-xs text-gray-400 font-normal"> (auto-calculated)</span> : null}
+              Lease End Date{details.leasePeriodMonths ? <span className="text-sm text-gray-600 font-normal"> (auto-calculated)</span> : null}
             </label>
             <input type="date" name="leaseEnd" value={details.leaseEnd || ''} onChange={handleLeaseEndChange} className={inputCls} />
           </div>
           <div><label className={labelCls}>Security Deposit</label><input type="text" name="deposit" value={details.deposit || ''} onChange={handleChange} placeholder="e.g. $7,000" className={inputCls} /></div>
         </div>
-        <p className="text-xs text-gray-400 mt-3">Enter a lease period (e.g. 24 months) with a start date to auto-fill the end date — or leave period blank and set the end date yourself.</p>
+        <p className="text-sm text-gray-600 mt-3">Enter a lease period (e.g. 24 months) with a start date to auto-fill the end date — or leave period blank and set the end date yourself.</p>
       </div>
 
       <div className="bg-white rounded-lg shadow p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900">Landlord(s)</h2>
-          <button onClick={addLandlord} className="text-sm text-primary-600 hover:text-primary-700 font-medium">+ Add Landlord</button>
+          <button onClick={addLandlord} className="text-base text-primary-600 hover:text-primary-700 font-medium">+ Add Landlord</button>
         </div>
         <div className="space-y-3">
           {details.landlords.map((l, idx) => (
             <div key={l.id} className="flex items-center gap-3">
-              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-sm font-semibold">{idx + 1}</div>
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-base font-semibold">{idx + 1}</div>
               <input type="text" value={l.name} onChange={e => updateLandlord(l.id, { name: e.target.value })} placeholder="Full name" className={`flex-1 ${inputCls}`} />
-              {details.landlords.length > 1 && <button onClick={() => removeLandlord(l.id)} className="text-gray-400 hover:text-red-500 text-xl">×</button>}
+              {details.landlords.length > 1 && <button onClick={() => removeLandlord(l.id)} className="text-gray-600 hover:text-red-500 text-xl">×</button>}
             </div>
           ))}
         </div>
@@ -136,14 +136,14 @@ export const PropertyDetails: React.FC = () => {
       <div className="bg-white rounded-lg shadow p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900">Tenant(s)</h2>
-          <button onClick={addTenant} className="text-sm text-primary-600 hover:text-primary-700 font-medium">+ Add Tenant</button>
+          <button onClick={addTenant} className="text-base text-primary-600 hover:text-primary-700 font-medium">+ Add Tenant</button>
         </div>
         <div className="space-y-3">
           {details.tenants.map((l, idx) => (
             <div key={l.id} className="flex items-center gap-3">
-              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-sm font-semibold">{idx + 1}</div>
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-base font-semibold">{idx + 1}</div>
               <input type="text" value={l.name} onChange={e => updateTenant(l.id, { name: e.target.value })} placeholder="Full name" className={`flex-1 ${inputCls}`} />
-              {details.tenants.length > 1 && <button onClick={() => removeTenant(l.id)} className="text-gray-400 hover:text-red-500 text-xl">×</button>}
+              {details.tenants.length > 1 && <button onClick={() => removeTenant(l.id)} className="text-gray-600 hover:text-red-500 text-xl">×</button>}
             </div>
           ))}
         </div>
@@ -152,15 +152,15 @@ export const PropertyDetails: React.FC = () => {
       <div className="bg-white rounded-lg shadow p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900">Agent(s)</h2>
-          <button onClick={addAgent} className="text-sm text-primary-600 hover:text-primary-700 font-medium">+ Add Agent</button>
+          <button onClick={addAgent} className="text-base text-primary-600 hover:text-primary-700 font-medium">+ Add Agent</button>
         </div>
         {agents.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-2">No agent added. Click "+ Add Agent" if applicable.</p>
+          <p className="text-base text-gray-600 text-center py-2">No agent added. Click "+ Add Agent" if applicable.</p>
         ) : (
           <div className="space-y-4">
             {agents.map((agent: AgentInfo, idx: number) => (
-              <div key={idx} className="border border-gray-200 rounded-lg p-4 relative">
-                <button onClick={() => removeAgent(String(idx))} className="absolute top-3 right-3 text-gray-300 hover:text-red-500 text-xl">×</button>
+              <div key={idx} className="border border-gray-300 rounded-lg p-4 relative">
+                <button onClick={() => removeAgent(String(idx))} className="absolute top-3 right-3 text-gray-600 hover:text-red-500 text-xl">×</button>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
                     <label className={labelCls}>Agent Name</label>
@@ -176,7 +176,7 @@ export const PropertyDetails: React.FC = () => {
                       {(['landlord', 'tenant', 'both'] as const).map(v => (
                         <label key={v} className="flex items-center gap-1.5 cursor-pointer">
                           <input type="radio" name={`sf-${idx}`} value={v} checked={(agent.servingFor || 'both') === v} onChange={() => updateAgent(String(idx), { servingFor: v })} />
-                          <span className="text-sm text-gray-700 capitalize">{v === 'both' ? 'Both Parties' : v.charAt(0).toUpperCase() + v.slice(1)}</span>
+                          <span className="text-base text-gray-800 capitalize">{v === 'both' ? 'Both Parties' : v.charAt(0).toUpperCase() + v.slice(1)}</span>
                         </label>
                       ))}
                     </div>

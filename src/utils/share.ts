@@ -20,7 +20,26 @@
 // the expected/preferred behaviour there.
 export function isMobileDevice(): boolean {
   if (typeof navigator === 'undefined') return false;
-  return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) return true;
+  // iPadOS 13+ Safari reports its User-Agent as desktop macOS by default (no
+  // "iPad" token), so the check above alone misses every modern iPad — it falls
+  // through to the desktop code path, which is the flaky one on iPad Safari
+  // (blob downloads via `<a download>` can silently fail or leave a blank tab).
+  // A touch-capable "MacIntel" is the standard way to catch this case.
+  return navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+}
+
+// Builds a readable report filename, e.g. buildReportFilename(['Inventory Report', address, tenantNames])
+// -> "Inventory Report-123 Example Rd-Jane Tan.pdf". Empty/undefined parts are skipped so the
+// name degrades gracefully (e.g. no tenant signed yet) instead of leaving stray dashes.
+// Only characters that are unsafe in a filename on Windows/macOS are stripped — everything
+// else (spaces, commas, accents) is kept so the name stays human-readable.
+export function buildReportFilename(parts: Array<string | null | undefined>, extension = 'pdf'): string {
+  const clean = parts
+    .map(p => (p || '').replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+  const base = (clean.join('-') || 'report').slice(0, 150);
+  return `${base}.${extension}`;
 }
 
 const PREVIEWABLE_MIME_PREFIXES = ['application/pdf', 'image/'];

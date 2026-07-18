@@ -50,6 +50,7 @@ interface PropertyContextType {
   updateRoom: (id: string, u: Partial<Room>) => void;
   deleteRoom: (id: string) => void;
   reorderRoom: (id: string, dir: 'up' | 'down') => void;
+  reorderRoomTo: (id: string, newIndex: number) => void;
   addItem: (roomId: string, item: Omit<InventoryItem, 'id'>) => void;
   updateItem: (roomId: string, itemId: string, u: Partial<InventoryItem>) => void;
   deleteItem: (roomId: string, itemId: string) => void;
@@ -126,6 +127,19 @@ export const PropertyProvider: React.FC<{ children: ReactNode }> = ({ children }
       const j = dir === 'up' ? i - 1 : i + 1;
       if (i < 0 || j < 0 || j >= rooms.length) return p;
       [rooms[i], rooms[j]] = [rooms[j], rooms[i]];
+      return t({ ...p, rooms: rooms.map((r, k) => ({ ...r, order: k })) });
+    }), []);
+  // Moves a room directly to an arbitrary index — used by press-and-drag reordering,
+  // where the drop target can be more than one slot away from the start.
+  const reorderRoomTo = useCallback((id: string, newIndex: number) =>
+    setProfile(p => {
+      const rooms = [...p.rooms];
+      const i = rooms.findIndex(r => r.id === id);
+      if (i < 0) return p;
+      const clamped = Math.max(0, Math.min(newIndex, rooms.length - 1));
+      if (clamped === i) return p;
+      const [moved] = rooms.splice(i, 1);
+      rooms.splice(clamped, 0, moved);
       return t({ ...p, rooms: rooms.map((r, k) => ({ ...r, order: k })) });
     }), []);
 
@@ -233,7 +247,7 @@ export const PropertyProvider: React.FC<{ children: ReactNode }> = ({ children }
       addLandlord, updateLandlord, removeLandlord,
       addTenant, updateTenant, removeTenant,
       addAgent, updateAgent, removeAgent,
-      addRoom, updateRoom, deleteRoom, reorderRoom,
+      addRoom, updateRoom, deleteRoom, reorderRoom, reorderRoomTo,
       addItem, updateItem, deleteItem,
       addKey, updateKey, deleteKey, setKeyItemList,
       setRoomItemList, renameGlobalItem,

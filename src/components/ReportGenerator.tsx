@@ -1,15 +1,18 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { useProperty } from '../store/PropertyContext';
 import { KEY_SECTION_LABELS } from '../types';
 import type { KeySection } from '../types';
 import { SigField } from './SigField';
 import { fd } from '../utils/date';
-import { shareOrDownload, isMobileDevice } from '../utils/share';
+import { shareOrDownload, isMobileDevice, buildReportFilename } from '../utils/share';
+import { useDragReorder } from '../utils/dragReorder';
 
 const SECTIONS: KeySection[] = ['keys', 'access_cards', 'remote_controls', 'others', 'meter_readings'];
 
 export const ReportGenerator: React.FC = () => {
-  const { profile, isLocked, addSignature, deleteSignature, reorderRoom, updateItem, updateKey } = useProperty();
+  const { profile, isLocked, addSignature, deleteSignature, reorderRoomTo, updateItem, updateKey } = useProperty();
+  const roomSeqRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const { dragId: roomSeqDragId, startDrag: startRoomSeqDrag, getRowStyle: getRoomSeqRowStyle } = useDragReorder(profile.rooms.length, reorderRoomTo);
 
   const agents = profile.details.agents || [];
 
@@ -37,7 +40,11 @@ export const ReportGenerator: React.FC = () => {
     // preview tab. See utils/share.ts for the full explanation.
     const previewWin = isMobileDevice() ? window.open('', '_blank') : null;
     const { default: jsPDF } = await import('jspdf');
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    // `compress: true` is required for jsPDF to Flate-compress embedded images (signatures).
+    // Without it, PNGs are stored as raw, uncompressed bitmaps — a single ~700x530 signature
+    // balloons to well over 1MB apiece, which is why a 3-4 page text report was coming out
+    // several megabytes in size.
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
     const W = 210, H = 297, ML = 15, MR = 15, MT = 15;
 
     // Footer signature strip shows Landlord & Tenant only — Agent appears solely on the final signature page.
@@ -345,7 +352,11 @@ export const ReportGenerator: React.FC = () => {
       doc.text(`Page ${pg} of ${tp}`, W - MR, H - 5, { align: 'right' });
     }
 
-    const filename = `${(profile.details.address || 'property-inventory').replace(/[^a-z0-9]/gi, '_').slice(0, 50)}.pdf`;
+    const filename = buildReportFilename(['Inventory Report', profile.details.address, tenantNames.join(', ')]);
+    // The mobile "preview" flow opens the PDF straight from a blob: URL, which carries no
+    // filename metadata — iOS Safari falls back to naming the saved/shared file "Unknown"
+    // unless the PDF's own /Title is set, which it then uses as the suggested filename.
+    doc.setProperties({ title: filename.replace(/\.pdf$/i, '') });
     await shareOrDownload(doc.output('blob') as Blob, filename, 'application/pdf', previewWin);
   };
 
@@ -362,7 +373,7 @@ export const ReportGenerator: React.FC = () => {
           ].map(s => (
             <div key={s.l} className="text-center p-3 bg-gray-50 rounded-lg">
               <div className="text-2xl font-bold text-primary-600">{s.v}</div>
-              <div className="text-xs text-gray-500">{s.l}</div>
+              <div className="text-sm text-gray-700">{s.l}</div>
             </div>
           ))}
         </div>
@@ -371,16 +382,27 @@ export const ReportGenerator: React.FC = () => {
       <fieldset disabled={isLocked} className="contents m-0 p-0 border-0 min-w-0">
       {profile.rooms.length > 1 && (
         <div className="bg-white rounded-lg shadow p-4">
-          <h2 className="text-lg font-semibold text-gray-900 mb-2">Room Sequence in Report</h2>
+          <h2 className="text-lg font-semibold text-gray-900 mb-1">Room Sequence in Report</h2>
+          <p className="text-base text-gray-700 mb-2">Press the grip and slide a room up or down to reorder.</p>
           <div className="space-y-2">
             {profile.rooms.map((room, idx) => (
-              <div key={room.id} className="flex items-center gap-3 p-2.5 bg-gray-50 rounded-lg">
-                <span className="w-6 h-6 rounded-full bg-primary-100 text-primary-700 text-xs font-bold flex items-center justify-center flex-shrink-0">{idx + 1}</span>
-                <span className="flex-1 text-sm font-medium text-gray-800">{room.name}</span>
-                <div className="flex gap-1">
-                  <button onClick={() => reorderRoom(room.id, 'up')} disabled={idx === 0} className="w-7 h-7 flex items-center justify-center rounded bg-white border border-gray-200 text-gray-500 hover:bg-gray-100 disabled:opacity-30 text-xs">▲</button>
-                  <button onClick={() => reorderRoom(room.id, 'down')} disabled={idx === profile.rooms.length - 1} className="w-7 h-7 flex items-center justify-center rounded bg-white border border-gray-200 text-gray-500 hover:bg-gray-100 disabled:opacity-30 text-xs">▼</button>
-                </div>
+              <div
+                key={room.id}
+                ref={el => { if (el) roomSeqRefs.current.set(room.id, el); else roomSeqRefs.current.delete(room.id); }}
+                className="flex items-center gap-3 p-2.5 bg-gray-50 border border-gray-300 rounded-lg"
+                style={getRoomSeqRowStyle(room.id, idx)}
+              >
+                <span className="w-6 h-6 rounded-full bg-primary-100 text-primary-700 text-sm font-bold flex items-center justify-center flex-shrink-0">{idx + 1}</span>
+                <span className="flex-1 text-base font-medium text-gray-900">{room.name}</span>
+                <button
+                  type="button"
+                  onPointerDown={e => startRoomSeqDrag(e, room.id, idx, roomSeqRefs.current.get(room.id) || null)}
+                  className={`w-8 h-8 flex-shrink-0 flex items-center justify-center rounded bg-white border border-gray-400 text-gray-700 hover:bg-gray-100 touch-none ${roomSeqDragId === room.id ? 'cursor-grabbing text-primary-600' : 'cursor-grab'}`}
+                  title="Press and drag to reorder"
+                  aria-label="Drag to reorder room"
+                >
+                  <span className="text-lg leading-none select-none">⠿</span>
+                </button>
               </div>
             ))}
           </div>
@@ -393,10 +415,10 @@ export const ReportGenerator: React.FC = () => {
           <div className="space-y-4">
             {profile.rooms.map(room => (
               <div key={room.id}>
-                <h3 className="font-semibold text-xs text-gray-500 uppercase tracking-wide mb-2">{room.name}</h3>
-                {room.items.length === 0 ? <p className="text-xs text-gray-400 pl-2">No items.</p> : (
-                  <div className="overflow-x-auto rounded border border-gray-100">
-                    <table className="w-full text-xs">
+                <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide mb-2">{room.name}</h3>
+                {room.items.length === 0 ? <p className="text-sm text-gray-600 pl-2">No items.</p> : (
+                  <div className="overflow-x-auto rounded border border-gray-300">
+                    <table className="w-full text-sm">
                       <thead><tr className="bg-slate-700 text-white">
                         <th className="text-left px-3 py-2 w-8">#</th>
                         <th className="text-left px-3 py-2">Item</th>
@@ -406,14 +428,14 @@ export const ReportGenerator: React.FC = () => {
                       </tr></thead>
                       <tbody>{room.items.map((item, ii) => (
                         <tr key={item.id} className={ii % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                          <td className="px-3 py-1.5 text-gray-400">{ii + 1}</td>
+                          <td className="px-3 py-1.5 text-gray-600">{ii + 1}</td>
                           <td className="px-3 py-1.5 font-medium text-gray-800">{item.name}</td>
-                          <td className="px-1 py-1"><input type="text" value={item.brandModel || ''} onChange={e => updateItem(room.id, item.id, { brandModel: e.target.value })} placeholder="—" className="w-full border border-transparent hover:border-gray-200 focus:border-primary-400 rounded px-2 py-0.5 text-xs focus:outline-none bg-transparent focus:bg-white" /></td>
+                          <td className="px-1 py-1"><input type="text" value={item.brandModel || ''} onChange={e => updateItem(room.id, item.id, { brandModel: e.target.value })} placeholder="—" className="w-full border border-transparent hover:border-gray-300 focus:border-primary-400 rounded px-2 py-0.5 text-sm focus:outline-none bg-transparent focus:bg-white" /></td>
                           <td className="px-1 py-1"><input type="text" inputMode="numeric"
                             value={item.quantity !== undefined && item.quantity !== null ? String(item.quantity) : ''}
                             onChange={e => { const v = e.target.value; if (v === '') updateItem(room.id, item.id, { quantity: undefined }); else { const n = parseInt(v); if (!isNaN(n) && n >= 0) updateItem(room.id, item.id, { quantity: n }); } }}
-                            placeholder="—" className="w-full border border-transparent hover:border-gray-200 focus:border-primary-400 rounded px-2 py-0.5 text-xs text-center focus:outline-none bg-transparent focus:bg-white" /></td>
-                          <td className="px-1 py-1"><input type="text" value={item.remarks || ''} onChange={e => updateItem(room.id, item.id, { remarks: e.target.value })} placeholder="—" className="w-full border border-transparent hover:border-gray-200 focus:border-primary-400 rounded px-2 py-0.5 text-xs focus:outline-none bg-transparent focus:bg-white" /></td>
+                            placeholder="—" className="w-full border border-transparent hover:border-gray-300 focus:border-primary-400 rounded px-2 py-0.5 text-sm text-center focus:outline-none bg-transparent focus:bg-white" /></td>
+                          <td className="px-1 py-1"><input type="text" value={item.remarks || ''} onChange={e => updateItem(room.id, item.id, { remarks: e.target.value })} placeholder="—" className="w-full border border-transparent hover:border-gray-300 focus:border-primary-400 rounded px-2 py-0.5 text-sm focus:outline-none bg-transparent focus:bg-white" /></td>
                         </tr>
                       ))}</tbody>
                     </table>
@@ -442,9 +464,9 @@ export const ReportGenerator: React.FC = () => {
                 const isMeter = sec === 'meter_readings';
                 return (
                   <div key={sec}>
-                    <h3 className="font-semibold text-xs text-gray-500 uppercase tracking-wide mb-2">{sectionLabels[sec]}</h3>
-                    <div className="overflow-x-auto rounded border border-gray-100">
-                      <table className="w-full text-xs">
+                    <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide mb-2">{sectionLabels[sec]}</h3>
+                    <div className="overflow-x-auto rounded border border-gray-300">
+                      <table className="w-full text-sm">
                         <thead>
                           <tr className="bg-slate-700 text-white">
                             <th className="text-left px-3 py-2">Description</th>
@@ -468,25 +490,25 @@ export const ReportGenerator: React.FC = () => {
                               <td className="px-3 py-1.5 font-medium text-gray-800">{item.description}</td>
                               {sec === 'access_cards' && (
                                 <td className="px-1 py-1">
-                                  <input type="text" value={item.reference || ''} onChange={e => updateKey(item.id, { reference: e.target.value })} placeholder="—" className="w-full border border-transparent hover:border-gray-200 focus:border-primary-400 rounded px-2 py-0.5 text-xs focus:outline-none bg-transparent focus:bg-white" />
+                                  <input type="text" value={item.reference || ''} onChange={e => updateKey(item.id, { reference: e.target.value })} placeholder="—" className="w-full border border-transparent hover:border-gray-300 focus:border-primary-400 rounded px-2 py-0.5 text-sm focus:outline-none bg-transparent focus:bg-white" />
                                 </td>
                               )}
                               {isMeter ? (
                                 <>
                                   <td className="px-1 py-1">
-                                    <input type="text" value={item.reading || ''} onChange={e => updateKey(item.id, { reading: e.target.value })} placeholder="—" className="w-full border border-transparent hover:border-gray-200 focus:border-primary-400 rounded px-2 py-0.5 text-xs focus:outline-none bg-transparent focus:bg-white" />
+                                    <input type="text" value={item.reading || ''} onChange={e => updateKey(item.id, { reading: e.target.value })} placeholder="—" className="w-full border border-transparent hover:border-gray-300 focus:border-primary-400 rounded px-2 py-0.5 text-sm focus:outline-none bg-transparent focus:bg-white" />
                                   </td>
                                   <td className="px-1 py-1">
-                                    <input type="date" value={item.readingDate || ''} onChange={e => updateKey(item.id, { readingDate: e.target.value })} className="w-full border border-transparent hover:border-gray-200 focus:border-primary-400 rounded px-2 py-0.5 text-xs focus:outline-none bg-transparent focus:bg-white" />
+                                    <input type="date" value={item.readingDate || ''} onChange={e => updateKey(item.id, { readingDate: e.target.value })} className="w-full border border-transparent hover:border-gray-300 focus:border-primary-400 rounded px-2 py-0.5 text-sm focus:outline-none bg-transparent focus:bg-white" />
                                   </td>
                                 </>
                               ) : (
                                 <>
                                   <td className="px-1 py-1">
-                                    <input type="text" inputMode="numeric" value={item.quantity !== undefined && item.quantity !== null ? String(item.quantity) : ''} onChange={e => { const v = e.target.value; if (v === '') updateKey(item.id, { quantity: undefined }); else { const n = parseInt(v); if (!isNaN(n) && n >= 0) updateKey(item.id, { quantity: n }); } }} placeholder="—" className="w-full border border-transparent hover:border-gray-200 focus:border-primary-400 rounded px-2 py-0.5 text-xs text-center focus:outline-none bg-transparent focus:bg-white" />
+                                    <input type="text" inputMode="numeric" value={item.quantity !== undefined && item.quantity !== null ? String(item.quantity) : ''} onChange={e => { const v = e.target.value; if (v === '') updateKey(item.id, { quantity: undefined }); else { const n = parseInt(v); if (!isNaN(n) && n >= 0) updateKey(item.id, { quantity: n }); } }} placeholder="—" className="w-full border border-transparent hover:border-gray-300 focus:border-primary-400 rounded px-2 py-0.5 text-sm text-center focus:outline-none bg-transparent focus:bg-white" />
                                   </td>
                                   <td className="px-1 py-1">
-                                    <input type="text" value={item.remarks || ''} onChange={e => updateKey(item.id, { remarks: e.target.value })} placeholder="—" className="w-full border border-transparent hover:border-gray-200 focus:border-primary-400 rounded px-2 py-0.5 text-xs focus:outline-none bg-transparent focus:bg-white" />
+                                    <input type="text" value={item.remarks || ''} onChange={e => updateKey(item.id, { remarks: e.target.value })} placeholder="—" className="w-full border border-transparent hover:border-gray-300 focus:border-primary-400 rounded px-2 py-0.5 text-sm focus:outline-none bg-transparent focus:bg-white" />
                                   </td>
                                 </>
                               )}
@@ -505,7 +527,7 @@ export const ReportGenerator: React.FC = () => {
 
       <div className="bg-white rounded-lg shadow p-4">
         <h2 className="text-lg font-semibold text-gray-900 mb-2">Signatures</h2>
-        <p className="text-sm text-gray-500 mb-4">Each party gets their own pad. The date defaults to the handover date and can be edited. Add more parties on the Property tab.</p>
+        <p className="text-base text-gray-700 mb-4">Each party gets their own pad. The date defaults to the handover date and can be edited. Add more parties on the Property tab.</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           {sigRoles.map(({ role, label, defaultName }) => (
             <SigField
@@ -524,12 +546,12 @@ export const ReportGenerator: React.FC = () => {
 
       <div className="bg-white rounded-lg shadow p-4">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Generate Report</h2>
-        <p className="text-xs text-gray-400 mb-3">To save or load this property's data, use "Save Work" / "Load File" / "Saved Files" at the top of the page. To clear everything and start over, use "Reset" at the top of the page.</p>
+        <p className="text-sm text-gray-600 mb-3">To save or load this property's data, use "Save Work" / "Load File" / "Saved Files" at the top of the page. To clear everything and start over, use "Reset" at the top of the page.</p>
         <button onClick={generatePDF} className="flex items-center gap-3 p-4 bg-primary-50 rounded-lg hover:bg-primary-100 transition-colors text-left w-full sm:w-auto sm:min-w-[280px]">
           <span className="text-2xl">📄</span>
           <div>
-            <div className="font-semibold text-primary-700 text-sm">Generate PDF Report</div>
-            <div className="text-xs text-primary-500">Printer-friendly A4 — signatures on every page</div>
+            <div className="font-semibold text-primary-700 text-base">Generate PDF Report</div>
+            <div className="text-sm text-primary-500">Printer-friendly A4 — signatures on every page</div>
           </div>
         </button>
       </div>

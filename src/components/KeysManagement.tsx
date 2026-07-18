@@ -3,7 +3,7 @@ import { useProperty } from '../store/PropertyContext';
 import type { KeyItem, KeySection } from '../types';
 import { KEY_SECTION_LABELS, SECTIONS_WITH_DROPDOWNS, DEFAULT_KEY_ITEM_LISTS } from '../types';
 
-const inputCls = 'w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500';
+const inputCls = 'w-full border border-gray-400 rounded-md px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-primary-500';
 const SECTIONS: KeySection[] = ['keys', 'access_cards', 'remote_controls', 'others', 'meter_readings'];
 
 // ── Dropdown list manager ───────────────────────────────────────────────────
@@ -24,8 +24,8 @@ const ListManager: React.FC<{ items: string[]; onSave: (items: string[]) => void
   return (
     <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-semibold text-yellow-800">Edit Dropdown List</span>
-        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
+        <span className="text-sm font-semibold text-yellow-800">Edit Dropdown List</span>
+        <button onClick={onClose} className="text-gray-600 hover:text-gray-700 text-lg leading-none">×</button>
       </div>
       <div className="space-y-1 max-h-40 overflow-y-auto mb-2">
         {list.map((item, i) => (
@@ -33,24 +33,24 @@ const ListManager: React.FC<{ items: string[]; onSave: (items: string[]) => void
             {editIdx === i ? (
               <input autoFocus type="text" value={editVal} onChange={e => setEditVal(e.target.value)}
                 onBlur={commitEdit} onKeyDown={e => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditIdx(null); }}
-                className="flex-1 border border-primary-400 rounded px-2 py-0.5 text-xs focus:outline-none" />
+                className="flex-1 border border-primary-400 rounded px-2 py-0.5 text-sm focus:outline-none" />
             ) : (
-              <span className="flex-1 text-xs text-gray-700 truncate">{item}</span>
+              <span className="flex-1 text-sm text-gray-800 truncate">{item}</span>
             )}
-            <button onClick={() => startEdit(i)} className="text-gray-300 hover:text-primary-500 text-xs px-1" title="Rename">✎</button>
-            <button onClick={() => remove(i)} className="text-gray-300 hover:text-red-500 text-xs px-1" title="Delete">×</button>
+            <button onClick={() => startEdit(i)} className="text-gray-600 hover:text-primary-500 text-sm px-1" title="Rename">✎</button>
+            <button onClick={() => remove(i)} className="text-gray-600 hover:text-red-500 text-sm px-1" title="Delete">×</button>
           </div>
         ))}
       </div>
       <div className="flex gap-1 mb-2">
         <input type="text" value={newItem} onChange={e => setNewItem(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && addItem()}
-          placeholder="Add new item..." className="flex-1 border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary-500" />
-        <button onClick={addItem} disabled={!newItem.trim()} className="px-2 py-1 text-xs text-white bg-primary-600 rounded hover:bg-primary-700 disabled:opacity-40">Add</button>
+          placeholder="Add new item..." className="flex-1 border border-gray-400 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500" />
+        <button onClick={addItem} disabled={!newItem.trim()} className="px-2 py-1 text-sm text-white bg-primary-600 rounded hover:bg-primary-700 disabled:opacity-40">Add</button>
       </div>
       <div className="flex gap-1">
-        <button onClick={() => { onSave(list); onClose(); }} className="flex-1 py-1.5 text-xs text-white bg-primary-600 rounded hover:bg-primary-700">Save List</button>
-        <button onClick={onClose} className="px-3 py-1.5 text-xs text-gray-600 bg-white border border-gray-300 rounded hover:bg-gray-50">Cancel</button>
+        <button onClick={() => { onSave(list); onClose(); }} className="flex-1 py-1.5 text-sm text-white bg-primary-600 rounded hover:bg-primary-700">Save List</button>
+        <button onClick={onClose} className="px-3 py-1.5 text-sm text-gray-700 bg-white border border-gray-400 rounded hover:bg-gray-50">Cancel</button>
       </div>
     </div>
   );
@@ -65,15 +65,15 @@ const KeyRow: React.FC<{ item: KeyItem; itemList: string[]; onUpdate: (u: Partia
 
     if (!editing) {
       return (
-        <div className="flex items-start justify-between p-3 bg-white border border-gray-100 rounded-lg">
+        <div className="flex items-start justify-between p-3 bg-white border border-gray-300 rounded-lg">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-medium text-sm text-gray-800">{item.description}</span>
+              <span className="font-medium text-base text-gray-800">{item.description}</span>
               {!isMeter && item.quantity !== undefined && item.quantity !== null && (
-                <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">x{item.quantity}</span>
+                <span className="text-sm text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">x{item.quantity}</span>
               )}
             </div>
-            <div className="text-xs text-gray-400 mt-1 space-y-0.5">
+            <div className="text-sm text-gray-600 mt-1 space-y-0.5">
               {isMeter && item.reading && <div>Reading: {item.reading}</div>}
               {isMeter && item.readingDate && <div>Date: {item.readingDate}</div>}
               {isAccessCard && item.reference && <div>Ref: {item.reference}</div>}
@@ -81,8 +81,8 @@ const KeyRow: React.FC<{ item: KeyItem; itemList: string[]; onUpdate: (u: Partia
             </div>
           </div>
           <div className="flex gap-1 ml-2 flex-shrink-0">
-            <button onClick={() => setEditing(true)} className="text-gray-400 hover:text-primary-600 px-1.5 py-1 text-sm">✏️</button>
-            <button onClick={onDelete} className="text-gray-400 hover:text-red-500 px-1.5 py-1 text-sm">🗑️</button>
+            <button onClick={() => setEditing(true)} className="text-gray-600 hover:text-primary-600 px-1.5 py-1 text-base">✏️</button>
+            <button onClick={onDelete} className="text-gray-600 hover:text-red-500 px-1.5 py-1 text-base">🗑️</button>
           </div>
         </div>
       );
@@ -92,7 +92,7 @@ const KeyRow: React.FC<{ item: KeyItem; itemList: string[]; onUpdate: (u: Partia
       <div className="p-3 bg-primary-50 border border-primary-200 rounded-lg space-y-2">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
           <div className="md:col-span-2">
-            <label className="block text-xs font-medium text-gray-600 mb-1">Description</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
             {isMeter ? (
               <select value={item.description} onChange={e => onUpdate({ description: e.target.value })} className={inputCls}>
                 {itemList.map(t => <option key={t} value={t}>{t}</option>)}
@@ -108,18 +108,18 @@ const KeyRow: React.FC<{ item: KeyItem; itemList: string[]; onUpdate: (u: Partia
           {isMeter ? (
             <>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Meter Reading</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Meter Reading</label>
                 <input type="text" value={item.reading || ''} onChange={e => onUpdate({ reading: e.target.value })} placeholder="e.g. 12345.6" className={inputCls} />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Date of Reading</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Date of Reading</label>
                 <input type="date" value={item.readingDate || ''} onChange={e => onUpdate({ readingDate: e.target.value })} className={inputCls} />
               </div>
             </>
           ) : (
             <>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Quantity <span className="text-gray-400 font-normal">(optional)</span></label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Quantity <span className="text-gray-600 font-normal">(optional)</span></label>
                 <input type="text" inputMode="numeric"
                   value={item.quantity === undefined || item.quantity === null ? '' : String(item.quantity)}
                   onChange={e => { const v = e.target.value; if (v === '') onUpdate({ quantity: undefined }); else { const n = parseInt(v); if (!isNaN(n) && n >= 0) onUpdate({ quantity: n }); } }}
@@ -127,18 +127,18 @@ const KeyRow: React.FC<{ item: KeyItem; itemList: string[]; onUpdate: (u: Partia
               </div>
               {isAccessCard && (
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Reference No.</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Reference No.</label>
                   <input type="text" value={item.reference || ''} onChange={e => onUpdate({ reference: e.target.value })} placeholder="Card number or ID" className={inputCls} />
                 </div>
               )}
               <div className={isAccessCard ? '' : 'md:col-span-2'}>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Remarks</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Remarks</label>
                 <input type="text" value={item.remarks || ''} onChange={e => onUpdate({ remarks: e.target.value })} placeholder="Optional..." className={inputCls} />
               </div>
             </>
           )}
         </div>
-        <button onClick={() => setEditing(false)} className="text-sm text-primary-600 font-medium hover:text-primary-800">Done</button>
+        <button onClick={() => setEditing(false)} className="text-base text-primary-600 font-medium hover:text-primary-800">Done</button>
       </div>
     );
   };
@@ -176,12 +176,12 @@ const AddKeyForm: React.FC<{ section: KeySection; itemList: string[]; onAdd: (it
     return (
       <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
         <div className="flex justify-between items-center">
-          <span className="text-sm font-medium text-blue-800">New Entry</span>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
+          <span className="text-base font-medium text-blue-800">New Entry</span>
+          <button onClick={onClose} className="text-gray-600 hover:text-gray-700 text-lg leading-none">×</button>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
           <div className="md:col-span-2">
-            <label className="block text-xs font-medium text-gray-600 mb-1">Description *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Description *</label>
             <select value={description} onChange={e => setDescription(e.target.value)} className={inputCls}>
               <option value="">Select...</option>
               {itemList.map(t => <option key={t} value={t}>{t}</option>)}
@@ -194,18 +194,18 @@ const AddKeyForm: React.FC<{ section: KeySection; itemList: string[]; onAdd: (it
           {isMeter ? (
             <>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Meter Reading</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Meter Reading</label>
                 <input type="text" value={reading} onChange={e => setReading(e.target.value)} placeholder="e.g. 12345.6" className={inputCls} />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Date of Reading</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Date of Reading</label>
                 <input type="date" value={readingDate} onChange={e => setReadingDate(e.target.value)} className={inputCls} />
               </div>
             </>
           ) : (
             <>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Quantity <span className="text-gray-400 font-normal">(optional)</span></label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Quantity <span className="text-gray-600 font-normal">(optional)</span></label>
                 <input type="text" inputMode="numeric"
                   value={quantity === undefined ? '' : String(quantity)}
                   onChange={e => { const v = e.target.value; if (v === '') setQuantity(undefined); else { const n = parseInt(v); if (!isNaN(n) && n >= 0) setQuantity(n); } }}
@@ -213,21 +213,21 @@ const AddKeyForm: React.FC<{ section: KeySection; itemList: string[]; onAdd: (it
               </div>
               {isAccessCard && (
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Reference No.</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Reference No.</label>
                   <input type="text" value={reference} onChange={e => setReference(e.target.value)} placeholder="Card number or ID" className={inputCls} />
                 </div>
               )}
               <div className={isAccessCard ? '' : 'md:col-span-2'}>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Remarks</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Remarks</label>
                 <input type="text" value={remarks} onChange={e => setRemarks(e.target.value)} placeholder="Optional..." className={inputCls} />
               </div>
             </>
           )}
         </div>
         <div className="flex justify-end gap-2">
-          <button onClick={onClose} className="px-3 py-1.5 text-sm text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50">Cancel</button>
+          <button onClick={onClose} className="px-3 py-1.5 text-base text-gray-700 bg-white border border-gray-400 rounded-md hover:bg-gray-50">Cancel</button>
           <button onClick={handleAdd} disabled={!finalDesc && !customDesc}
-            className="px-3 py-1.5 text-sm text-white bg-primary-600 rounded-md hover:bg-primary-700 disabled:opacity-50">Add</button>
+            className="px-3 py-1.5 text-base text-white bg-primary-600 rounded-md hover:bg-primary-700 disabled:opacity-50">Add</button>
         </div>
       </div>
     );
@@ -249,21 +249,21 @@ export const KeysManagement: React.FC = () => {
         const hasDropdown = SECTIONS_WITH_DROPDOWNS.includes(section);
         return (
           <div key={section} className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-300 bg-gray-50">
               <div className="flex items-center gap-2">
-                <h3 className="font-semibold text-gray-900 text-sm">{KEY_SECTION_LABELS[section]}</h3>
-                {items.length > 0 && <span className="text-xs text-gray-400 bg-gray-200 px-2 py-0.5 rounded-full">{items.length}</span>}
+                <h3 className="font-semibold text-gray-900 text-base">{KEY_SECTION_LABELS[section]}</h3>
+                {items.length > 0 && <span className="text-sm text-gray-600 bg-gray-200 px-2 py-0.5 rounded-full">{items.length}</span>}
               </div>
               <div className="flex items-center gap-2">
                 {hasDropdown && (
-                  <button onClick={() => setManagingList(managingList === section ? null : section)} className="text-xs text-gray-400 hover:text-gray-600 border border-gray-200 rounded px-2 py-0.5" title="Edit dropdown list">Edit List</button>
+                  <button onClick={() => setManagingList(managingList === section ? null : section)} className="text-sm text-gray-600 hover:text-gray-700 border border-gray-300 rounded px-2 py-0.5" title="Edit dropdown list">Edit List</button>
                 )}
-                <button onClick={() => setAddingTo(addingTo === section ? null : section)} className="text-sm text-primary-600 hover:text-primary-700 font-medium">+ Add</button>
+                <button onClick={() => setAddingTo(addingTo === section ? null : section)} className="text-base text-primary-600 hover:text-primary-700 font-medium">+ Add</button>
               </div>
             </div>
             <div className="p-4">
               {items.length === 0 && addingTo !== section && managingList !== section && (
-                <p className="text-xs text-gray-400 text-center py-2">No entries yet.</p>
+                <p className="text-sm text-gray-600 text-center py-2">No entries yet.</p>
               )}
               <div className="space-y-2">
                 {items.map(item => (

@@ -6,25 +6,25 @@ import { shareOrDownload } from '../utils/share';
 import type { TakeoverData, TakeoverKeyItem, TakeoverDocument, TakeoverDocumentStatus, TakeoverRoomNote, TakeoverDeduction } from '../types';
 import { TAKEOVER_KEY_PRESETS, TAKEOVER_DOCUMENT_PRESETS, TAKEOVER_AREA_PRESETS } from '../types';
 
-const inputCls = 'w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500';
+const inputCls = 'w-full border border-gray-400 rounded-md px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-primary-500';
 // Field/section label styling echoes the SRI CRM form editor: small, bold,
 // uppercase, letter-spaced captions in a muted colour with a hairline rule
 // under section titles — matching its .field label / .fg-title look.
-const labelCls = 'block text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-1.5';
-const sectionTitleTextCls = 'text-xs font-bold uppercase tracking-wider text-gray-500';
-const sectionTitleCls = `${sectionTitleTextCls} pb-2 mb-4 border-b border-gray-200`;
-const sectionHeaderRowCls = 'flex items-center justify-between pb-2 mb-3 border-b border-gray-200';
+const labelCls = 'block text-xs font-bold uppercase tracking-wide text-gray-700 mb-1.5';
+const sectionTitleTextCls = 'text-sm font-bold uppercase tracking-wider text-gray-700';
+const sectionTitleCls = `${sectionTitleTextCls} pb-2 mb-4 border-b border-gray-300`;
+const sectionHeaderRowCls = 'flex items-center justify-between pb-2 mb-3 border-b border-gray-300';
 
 // Data-entry lists render as real bordered tables — a solid white cell with a
 // visible border, not a borderless/transparent field — mirroring the fully-
 // gridded, boxed tables in the SRI CRM's printed handover form and making it
 // unambiguous that each cell is editable.
-const tableWrapCls = 'overflow-x-auto rounded-md border border-gray-300';
-const tableCls = 'w-full border-collapse text-sm';
+const tableWrapCls = 'overflow-x-auto rounded-md border border-gray-400';
+const tableCls = 'w-full border-collapse text-base';
 const theadRowCls = 'bg-gray-100';
-const thCls = 'text-left px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-gray-500 border-b border-gray-300 whitespace-nowrap';
-const tdCls = 'border-b border-gray-200 last:border-b-0 p-0 align-top';
-const tableInputCls = 'w-full bg-white border-0 px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-400';
+const thCls = 'text-left px-3 py-2 text-xs font-bold uppercase tracking-wide text-gray-700 border-b border-gray-400 whitespace-nowrap';
+const tdCls = 'border-b border-gray-300 last:border-b-0 p-0 align-top';
+const tableInputCls = 'w-full bg-white border-0 px-3 py-2 text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-400';
 const tableSelectCls = `${tableInputCls} cursor-pointer`;
 
 const fmtAmt = (n: number) => n.toLocaleString('en-SG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -126,7 +126,8 @@ export const TakeoverForm: React.FC = () => {
     setGenerating(true);
     try {
     const { default: jsPDF } = await import('jspdf');
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    // compress: true lets jsPDF Flate-compress embedded images instead of storing them raw.
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
     const W = 210, H = 297, ML = 15, MR = 15, MT = 15, MB = 14;
     const CW = W - ML - MR;
 
@@ -335,6 +336,9 @@ export const TakeoverForm: React.FC = () => {
     }
 
     const filename = `${(profile.details.address || 'property-takeover').replace(/[^a-z0-9]/gi, '_').slice(0, 50)}-takeover.pdf`;
+    // Same fix as the other reports: set the PDF's own /Title so iOS Safari suggests this
+    // filename instead of "Unknown" when saving/sharing from its blob-URL preview.
+    doc.setProperties({ title: filename.replace(/\.pdf$/i, '') });
     const blob = doc.output('blob') as Blob;
     const url = URL.createObjectURL(blob);
     setPreview(prev => { if (prev) URL.revokeObjectURL(prev.url); return { url, filename, blob }; });
@@ -355,19 +359,19 @@ export const TakeoverForm: React.FC = () => {
   return (
     <div className="space-y-6">
       {toast && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white text-sm px-4 py-2 rounded-lg shadow-lg pointer-events-none">
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white text-base px-4 py-2 rounded-lg shadow-lg pointer-events-none">
           {toast}
         </div>
       )}
 
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-base text-blue-800">
         Use this at the end of the lease, when you take the property back from the tenant. It's a separate record from the move-in inventory — your original Rooms/Keys/Photos stay untouched.
       </div>
 
       {isTakeoverLocked && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex flex-wrap items-center justify-between gap-2 text-sm text-amber-800">
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex flex-wrap items-center justify-between gap-2 text-base text-amber-800">
           <span>🔒 Locked for editing — signed by <strong>{signedLabels.join(', ')}</strong>. Clear these to make changes (everyone will need to sign again afterwards).</span>
-          <button onClick={handleClearAllTakeoverSignatures} className="text-xs font-semibold text-amber-900 underline hover:no-underline whitespace-nowrap">
+          <button onClick={handleClearAllTakeoverSignatures} className="text-sm font-semibold text-amber-900 underline hover:no-underline whitespace-nowrap">
             Clear All Takeover Signatures
           </button>
         </div>
@@ -383,12 +387,12 @@ export const TakeoverForm: React.FC = () => {
               <input type="date" value={takeover.inspectionDate || ''} onChange={e => updateTakeover({ inspectionDate: e.target.value })} className={inputCls} />
             </div>
             <div>
-              <label className={labelCls}>Lease End Date <span className="text-gray-400 font-normal">(from Property tab)</span></label>
-              <input type="text" readOnly value={fd(profile.details.leaseEnd)} className={`${inputCls} bg-gray-50 text-gray-500`} />
+              <label className={labelCls}>Lease End Date <span className="text-gray-600 font-normal">(from Property tab)</span></label>
+              <input type="text" readOnly value={fd(profile.details.leaseEnd)} className={`${inputCls} bg-gray-50 text-gray-700`} />
             </div>
             <div>
-              <label className={labelCls}>Landlord(s) <span className="text-gray-400 font-normal">(from Property tab)</span></label>
-              <input type="text" readOnly value={profile.details.landlords.map(l => l.name).filter(Boolean).join(', ') || '—'} className={`${inputCls} bg-gray-50 text-gray-500`} />
+              <label className={labelCls}>Landlord(s) <span className="text-gray-600 font-normal">(from Property tab)</span></label>
+              <input type="text" readOnly value={profile.details.landlords.map(l => l.name).filter(Boolean).join(', ') || '—'} className={`${inputCls} bg-gray-50 text-gray-700`} />
             </div>
             <div>
               <label className={labelCls}>Landlord Signing As</label>
@@ -398,8 +402,8 @@ export const TakeoverForm: React.FC = () => {
               </select>
             </div>
             <div>
-              <label className={labelCls}>Tenant(s) <span className="text-gray-400 font-normal">(from Property tab)</span></label>
-              <input type="text" readOnly value={profile.details.tenants.map(t => t.name).filter(Boolean).join(', ') || '—'} className={`${inputCls} bg-gray-50 text-gray-500`} />
+              <label className={labelCls}>Tenant(s) <span className="text-gray-600 font-normal">(from Property tab)</span></label>
+              <input type="text" readOnly value={profile.details.tenants.map(t => t.name).filter(Boolean).join(', ') || '—'} className={`${inputCls} bg-gray-50 text-gray-700`} />
             </div>
             <div>
               <label className={labelCls}>Tenant Signing As</label>
@@ -433,11 +437,11 @@ export const TakeoverForm: React.FC = () => {
           <div className={sectionHeaderRowCls}>
             <h2 className={sectionTitleTextCls}>Keys &amp; Access</h2>
             <div className="flex gap-2">
-              <button onClick={prefillKeys} className="text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded px-2 py-1">Load from Move-in Keys</button>
-              <button onClick={addKeyRow} className="text-sm text-primary-600 hover:text-primary-700 font-medium">+ Add</button>
+              <button onClick={prefillKeys} className="text-sm text-gray-700 hover:text-gray-800 border border-gray-300 rounded px-2 py-1">Load from Move-in Keys</button>
+              <button onClick={addKeyRow} className="text-base text-primary-600 hover:text-primary-700 font-medium">+ Add</button>
             </div>
           </div>
-          {takeover.keys.length === 0 ? <p className="text-xs text-gray-400 text-center py-2">No entries yet.</p> : (
+          {takeover.keys.length === 0 ? <p className="text-sm text-gray-600 text-center py-2">No entries yet.</p> : (
             <div className={tableWrapCls}>
               <table className={tableCls}>
                 <thead>
@@ -461,7 +465,7 @@ export const TakeoverForm: React.FC = () => {
                         <input type="text" value={k.remarks || ''} onChange={e => updateKeyRow(k.id, { remarks: e.target.value })} placeholder="e.g. All accounted for" className={tableInputCls} />
                       </td>
                       <td className={`${tdCls} text-center`}>
-                        <button onClick={() => deleteKeyRow(k.id)} className="text-gray-300 hover:text-red-500 text-lg leading-none">×</button>
+                        <button onClick={() => deleteKeyRow(k.id)} className="text-gray-600 hover:text-red-500 text-lg leading-none">×</button>
                       </td>
                     </tr>
                   ))}
@@ -475,9 +479,9 @@ export const TakeoverForm: React.FC = () => {
         <div className="bg-white rounded-lg shadow p-4">
           <div className={sectionHeaderRowCls}>
             <h2 className={sectionTitleTextCls}>Documents Submitted</h2>
-            <button onClick={addDocRow} className="text-sm text-primary-600 hover:text-primary-700 font-medium">+ Add</button>
+            <button onClick={addDocRow} className="text-base text-primary-600 hover:text-primary-700 font-medium">+ Add</button>
           </div>
-          {takeover.documents.length === 0 ? <p className="text-xs text-gray-400 text-center py-2">No documents recorded.</p> : (
+          {takeover.documents.length === 0 ? <p className="text-sm text-gray-600 text-center py-2">No documents recorded.</p> : (
             <div className={tableWrapCls}>
               <table className={tableCls}>
                 <thead>
@@ -506,7 +510,7 @@ export const TakeoverForm: React.FC = () => {
                         <input type="text" value={d.remarks || ''} onChange={e => updateDocRow(d.id, { remarks: e.target.value })} placeholder="e.g. dated 15 Jun 2026" className={tableInputCls} />
                       </td>
                       <td className={`${tdCls} text-center`}>
-                        <button onClick={() => deleteDocRow(d.id)} className="text-gray-300 hover:text-red-500 text-lg leading-none">×</button>
+                        <button onClick={() => deleteDocRow(d.id)} className="text-gray-600 hover:text-red-500 text-lg leading-none">×</button>
                       </td>
                     </tr>
                   ))}
@@ -521,11 +525,11 @@ export const TakeoverForm: React.FC = () => {
           <div className={sectionHeaderRowCls}>
             <h2 className={sectionTitleTextCls}>Room / Area Inspection</h2>
             <div className="flex gap-2">
-              <button onClick={prefillRooms} className="text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded px-2 py-1">Load from Move-in Rooms</button>
-              <button onClick={addRoomRow} className="text-sm text-primary-600 hover:text-primary-700 font-medium">+ Add</button>
+              <button onClick={prefillRooms} className="text-sm text-gray-700 hover:text-gray-800 border border-gray-300 rounded px-2 py-1">Load from Move-in Rooms</button>
+              <button onClick={addRoomRow} className="text-base text-primary-600 hover:text-primary-700 font-medium">+ Add</button>
             </div>
           </div>
-          {takeover.rooms.length === 0 ? <p className="text-xs text-gray-400 text-center py-2">No areas added yet.</p> : (
+          {takeover.rooms.length === 0 ? <p className="text-sm text-gray-600 text-center py-2">No areas added yet.</p> : (
             <div className={tableWrapCls}>
               <table className={tableCls}>
                 <thead>
@@ -545,7 +549,7 @@ export const TakeoverForm: React.FC = () => {
                         <textarea value={r.remarks || ''} onChange={e => updateRoomRow(r.id, { remarks: e.target.value })} placeholder="Observations / remarks" rows={1} className={`${tableInputCls} resize-y block`} />
                       </td>
                       <td className={`${tdCls} text-center`}>
-                        <button onClick={() => deleteRoomRow(r.id)} className="text-gray-300 hover:text-red-500 text-lg leading-none">×</button>
+                        <button onClick={() => deleteRoomRow(r.id)} className="text-gray-600 hover:text-red-500 text-lg leading-none">×</button>
                       </td>
                     </tr>
                   ))}
@@ -559,7 +563,7 @@ export const TakeoverForm: React.FC = () => {
         <div className="bg-white rounded-lg shadow p-4">
           <div className={sectionHeaderRowCls}>
             <h2 className={sectionTitleTextCls}>Deductions from Security Deposit</h2>
-            <button onClick={addDeductionRow} className="text-sm text-primary-600 hover:text-primary-700 font-medium">+ Add</button>
+            <button onClick={addDeductionRow} className="text-base text-primary-600 hover:text-primary-700 font-medium">+ Add</button>
           </div>
           {takeover.deductions.length > 0 && (
             <div className={`${tableWrapCls} mb-3`}>
@@ -581,7 +585,7 @@ export const TakeoverForm: React.FC = () => {
                     <input type="text" inputMode="decimal" value={x.amount !== undefined ? String(x.amount) : ''} onChange={e => { const v = e.target.value; updateDeductionRow(x.id, { amount: v === '' ? undefined : (parseFloat(v) || 0) }); }} placeholder="0.00" className={`${tableInputCls} text-right`} />
                   </td>
                   <td className={`${tdCls} text-center`}>
-                    <button onClick={() => deleteDeductionRow(x.id)} className="text-gray-300 hover:text-red-500 text-lg leading-none">×</button>
+                    <button onClick={() => deleteDeductionRow(x.id)} className="text-gray-600 hover:text-red-500 text-lg leading-none">×</button>
                   </td>
                 </tr>
               ))}
@@ -589,9 +593,9 @@ export const TakeoverForm: React.FC = () => {
               </table>
             </div>
           )}
-          <div className="border-t border-gray-100 pt-3 space-y-1.5 text-sm">
-            <div className="flex justify-between text-gray-600"><span>Total Deductions</span><span>S$ {fmtAmt(totalDeductions)}</span></div>
-            <div className="flex justify-between text-gray-600"><span>Security Deposit</span><span>S$ {fmtAmt(depositAmount)}</span></div>
+          <div className="border-t border-gray-300 pt-3 space-y-1.5 text-base">
+            <div className="flex justify-between text-gray-700"><span>Total Deductions</span><span>S$ {fmtAmt(totalDeductions)}</span></div>
+            <div className="flex justify-between text-gray-700"><span>Security Deposit</span><span>S$ {fmtAmt(depositAmount)}</span></div>
             <div className="flex justify-between font-semibold text-green-700 bg-green-50 rounded px-2 py-1.5"><span>Amount to Refund</span><span>S$ {fmtAmt(refundAmount)}</span></div>
           </div>
         </div>
@@ -622,7 +626,7 @@ export const TakeoverForm: React.FC = () => {
 
       <div className="bg-white rounded-lg shadow p-4">
         <h2 className={`${sectionTitleTextCls} mb-2`}>Signatures</h2>
-        <p className="text-sm text-gray-500 mb-4 pb-3 border-b border-gray-200">Separate from the move-in signatures — each party signs here to acknowledge the takeover.</p>
+        <p className="text-base text-gray-700 mb-4 pb-3 border-b border-gray-300">Separate from the move-in signatures — each party signs here to acknowledge the takeover.</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           {sigRoles.map(({ role, label, defaultName }) => (
             <SigField
@@ -648,8 +652,8 @@ export const TakeoverForm: React.FC = () => {
         >
           <span className="text-2xl">📄</span>
           <div>
-            <div className="font-semibold text-primary-700 text-sm">{generating ? 'Generating…' : 'Preview Takeover PDF'}</div>
-            <div className="text-xs text-primary-500">Review it before you download or share — serif, bordered A4 layout styled after the SRI CRM handover form</div>
+            <div className="font-semibold text-primary-700 text-base">{generating ? 'Generating…' : 'Preview Takeover PDF'}</div>
+            <div className="text-sm text-primary-500">Review it before you download or share — serif, bordered A4 layout styled after the SRI CRM handover form</div>
           </div>
         </button>
       </div>
@@ -659,13 +663,13 @@ export const TakeoverForm: React.FC = () => {
         <div className="fixed inset-0 z-50 flex flex-col bg-black/60">
           <div className="bg-white px-4 py-3 shadow">
             <div className="flex items-center justify-between gap-2">
-              <span className="font-semibold text-gray-900 text-sm truncate">Takeover PDF Preview</span>
+              <span className="font-semibold text-gray-900 text-base truncate">Takeover PDF Preview</span>
               <div className="flex items-center gap-2 shrink-0">
-                <button onClick={downloadTakeoverPreview} className="px-3 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700">Download / Share</button>
-                <button onClick={closeTakeoverPreview} aria-label="Close preview" className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+                <button onClick={downloadTakeoverPreview} className="px-3 py-1.5 text-base font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700">Download / Share</button>
+                <button onClick={closeTakeoverPreview} aria-label="Close preview" className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-gray-700 text-xl leading-none">✕</button>
               </div>
             </div>
-            <p className="text-xs text-gray-400 mt-1">If the preview doesn't display on your device, tap Download / Share to open it directly.</p>
+            <p className="text-sm text-gray-600 mt-1">If the preview doesn't display on your device, tap Download / Share to open it directly.</p>
           </div>
           <iframe title="Takeover PDF Preview" src={preview.url} className="flex-1 w-full bg-gray-100" />
         </div>

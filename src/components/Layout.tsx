@@ -614,7 +614,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
   return (
     <div className="min-h-screen bg-gray-50">
       {toast && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white text-sm px-4 py-2 rounded-lg shadow-lg pointer-events-none">
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white text-base px-4 py-2 rounded-lg shadow-lg pointer-events-none">
           {toast}
         </div>
       )}
@@ -623,30 +623,30 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40" onClick={() => setSaveDialogOpen(false)}>
           <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
             <h3 className="text-base font-semibold text-gray-900 mb-1">Save Work</h3>
-            <p className="text-sm text-gray-500 mb-4">
+            <p className="text-base text-gray-700 mb-4">
               {lastSavedName && saveFilename.trim() === lastSavedName
                 ? 'Same name as your last save — this will overwrite that file. Change the name to save a new copy instead.'
                 : 'Set a filename, then choose exactly where to save it on your computer.'}
             </p>
             <div className="mb-4">
-              <label className="block text-xs font-medium text-gray-600 mb-1">Filename</label>
-              <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-primary-500">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Filename</label>
+              <div className="flex items-center border border-gray-400 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-primary-500">
                 <input
                   autoFocus
                   type="text"
                   value={saveFilename}
                   onChange={e => setSaveFilename(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') confirmSave(); if (e.key === 'Escape') setSaveDialogOpen(false); }}
-                  className="flex-1 px-3 py-2 text-sm focus:outline-none"
+                  className="flex-1 px-3 py-2 text-base focus:outline-none"
                 />
-                <span className="px-3 text-sm text-gray-400 bg-gray-50 border-l border-gray-200 py-2">.json</span>
+                <span className="px-3 text-base text-gray-600 bg-gray-50 border-l border-gray-300 py-2">.json</span>
               </div>
             </div>
             <div className="flex gap-3">
-              <button onClick={confirmSave} className="flex-1 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700">
+              <button onClick={confirmSave} className="flex-1 py-2 text-base font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700">
                 {lastSavedName && saveFilename.trim() === lastSavedName ? 'Save (Overwrite)' : 'Choose Folder & Save'}
               </button>
-              <button onClick={() => setSaveDialogOpen(false)} className="flex-1 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+              <button onClick={() => setSaveDialogOpen(false)} className="flex-1 py-2 text-base font-medium text-gray-800 bg-white border border-gray-400 rounded-lg hover:bg-gray-50">
                 Cancel
               </button>
             </div>
@@ -658,26 +658,26 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40" onClick={closeRenameDialog}>
           <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
             <h3 className="text-base font-semibold text-gray-900 mb-1">Rename</h3>
-            <p className="text-sm text-gray-500 mb-4">Renaming "{renameEntry.filename}" — updates it everywhere it's saved (this device and the cloud, if synced).</p>
+            <p className="text-base text-gray-700 mb-4">Renaming "{renameEntry.filename}" — updates it everywhere it's saved (this device and the cloud, if synced).</p>
             <div className="mb-4">
-              <label className="block text-xs font-medium text-gray-600 mb-1">New name</label>
-              <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-primary-500">
+              <label className="block text-sm font-medium text-gray-700 mb-1">New name</label>
+              <div className="flex items-center border border-gray-400 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-primary-500">
                 <input
                   autoFocus
                   type="text"
                   value={renameValue}
                   onChange={e => setRenameValue(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') confirmRename(); if (e.key === 'Escape') closeRenameDialog(); }}
-                  className="flex-1 px-3 py-2 text-sm focus:outline-none"
+                  className="flex-1 px-3 py-2 text-base focus:outline-none"
                 />
-                <span className="px-3 text-sm text-gray-400 bg-gray-50 border-l border-gray-200 py-2">.json</span>
+                <span className="px-3 text-base text-gray-600 bg-gray-50 border-l border-gray-300 py-2">.json</span>
               </div>
             </div>
             <div className="flex gap-3">
-              <button onClick={confirmRename} disabled={renameSubmitting || !renameValue.trim()} className="flex-1 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50">
+              <button onClick={confirmRename} disabled={renameSubmitting || !renameValue.trim()} className="flex-1 py-2 text-base font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50">
                 Rename
               </button>
-              <button onClick={closeRenameDialog} className="flex-1 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+              <button onClick={closeRenameDialog} className="flex-1 py-2 text-base font-medium text-gray-800 bg-white border border-gray-400 rounded-lg hover:bg-gray-50">
                 Cancel
               </button>
             </div>
@@ -698,9 +698,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40" onClick={() => setSavedFilesOpen(false)}>
           <div className="bg-white rounded-xl shadow-xl p-6 max-w-md w-full mx-4 max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
             <h3 className="text-base font-semibold text-gray-900 mb-1">Saved Files</h3>
-            <p className="text-sm text-gray-500 mb-1">Every file you've saved with "Save Work" (or loaded in) lives here. Load any of them back in, or check the ones you want and hit Backup Selected.</p>
+            <p className="text-base text-gray-700 mb-1">Every file you've saved with "Save Work" (or loaded in) lives here. Load any of them back in, or check the ones you want and hit Backup Selected.</p>
             {!session && (
-              <p className="text-xs text-amber-700 mb-3">
+              <p className="text-sm text-amber-700 mb-3">
                 Only showing files saved on this device.{' '}
                 <button onClick={() => { setSavedFilesOpen(false); setAccountDialogOpen(true); }} className="underline font-medium hover:no-underline">
                   Sign in
@@ -709,17 +709,17 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
               </p>
             )}
             {mergedFiles.length > 0 && (
-              <div className="flex items-center justify-between px-1 py-1.5 border-b border-gray-100">
-                <label className="flex items-center gap-1.5 text-xs font-medium text-gray-500 cursor-pointer">
+              <div className="flex items-center justify-between px-1 py-1.5 border-b border-gray-300">
+                <label className="flex items-center gap-1.5 text-sm font-medium text-gray-700 cursor-pointer">
                   <input type="checkbox" checked={selectedForBackup.size === mergedFiles.length && selectedForBackup.size > 0} onChange={toggleSelectAllForBackup} />
                   Select all
                 </label>
-                <span className="text-xs text-gray-400">{selectedForBackup.size} selected</span>
+                <span className="text-sm text-gray-600">{selectedForBackup.size} selected</span>
               </div>
             )}
             <div className="flex-1 overflow-y-auto -mx-2 px-2 mt-2">
               {mergedFiles.length === 0 ? (
-                <p className="text-sm text-gray-400 py-6 text-center">No saved files yet.</p>
+                <p className="text-base text-gray-600 py-6 text-center">No saved files yet.</p>
               ) : (
                 <ul className="divide-y divide-gray-100">
                   {mergedFiles.map(entry => {
@@ -734,15 +734,15 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
                         className="shrink-0 mt-1"
                       />
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-gray-900 break-words" title={entry.filename}>
+                        <p className="text-base font-medium text-gray-900 break-words" title={entry.filename}>
                           {entry.filename}
                           {isActive && (
-                            <span className="ml-1.5 inline-block align-middle text-[10px] font-semibold text-primary-700 bg-primary-50 border border-primary-200 rounded px-1.5 py-0.5">
+                            <span className="ml-1.5 inline-block align-middle text-xs font-semibold text-primary-700 bg-primary-50 border border-primary-200 rounded px-1.5 py-0.5">
                               Active
                             </span>
                           )}
                         </p>
-                        <p className="text-xs text-gray-400">
+                        <p className="text-sm text-gray-600">
                           {new Date(entry.savedAt).toLocaleString()}
                           {entry.cloud && <span className="ml-1.5 text-primary-600">· synced</span>}
                           {sharedByOther && <span className="ml-1.5 text-amber-600">· shared by {entry.cloud!.ownerEmail}</span>}
@@ -750,26 +750,26 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
                         <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                           <button
                             onClick={() => handleLoadMerged(entry)}
-                            className="px-2.5 py-1 text-xs font-medium text-primary-600 bg-primary-50 rounded-md hover:bg-primary-100"
+                            className="px-2.5 py-1 text-sm font-medium text-primary-600 bg-primary-50 rounded-md hover:bg-primary-100"
                           >
                             Load
                           </button>
                           <button
                             onClick={() => openRenameDialog(entry)}
-                            className="px-2.5 py-1 text-xs font-medium text-gray-500 bg-gray-50 rounded-md hover:bg-gray-100"
+                            className="px-2.5 py-1 text-sm font-medium text-gray-700 bg-gray-50 rounded-md hover:bg-gray-100"
                           >
                             Rename
                           </button>
                           <button
                             onClick={() => handleDownloadMerged(entry)}
-                            className="px-2.5 py-1 text-xs font-medium text-gray-500 bg-gray-50 rounded-md hover:bg-gray-100"
+                            className="px-2.5 py-1 text-sm font-medium text-gray-700 bg-gray-50 rounded-md hover:bg-gray-100"
                             title="Download this file to your device / share to another app"
                           >
                             Download
                           </button>
                           <button
                             onClick={() => handleDeleteMerged(entry)}
-                            className="px-2.5 py-1 text-xs font-medium text-gray-500 bg-gray-50 rounded-md hover:bg-gray-100"
+                            className="px-2.5 py-1 text-sm font-medium text-gray-700 bg-gray-50 rounded-md hover:bg-gray-100"
                           >
                             Delete
                           </button>
@@ -785,11 +785,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
               <button
                 onClick={handleBackupSelected}
                 disabled={backingUp || selectedForBackup.size === 0}
-                className="flex-1 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50"
+                className="flex-1 py-2 text-base font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50"
               >
                 {backingUp ? 'Backing up…' : `Backup Selected${selectedForBackup.size ? ` (${selectedForBackup.size})` : ''}`}
               </button>
-              <button onClick={() => setSavedFilesOpen(false)} className="flex-1 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+              <button onClick={() => setSavedFilesOpen(false)} className="flex-1 py-2 text-base font-medium text-gray-800 bg-white border border-gray-400 rounded-lg hover:bg-gray-50">
                 Close
               </button>
             </div>
@@ -803,56 +803,56 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
             <button
               onClick={closeAccountDialog}
               aria-label="Close"
-              className="absolute top-4 right-4 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 text-lg leading-none"
+              className="absolute top-4 right-4 w-6 h-6 flex items-center justify-center text-gray-600 hover:text-gray-700 text-lg leading-none"
             >
               ✕
             </button>
             {!cloudSyncEnabled ? (
               <>
                 <h3 className="text-base font-semibold text-gray-900 mb-1 pr-6">Cloud Sync</h3>
-                <p className="text-sm text-gray-500">Cloud sync isn't configured for this build of the app.</p>
+                <p className="text-base text-gray-700">Cloud sync isn't configured for this build of the app.</p>
               </>
             ) : session ? (
               <>
                 <h3 className="text-base font-semibold text-gray-900 mb-1 pr-6">Account</h3>
-                <p className="text-sm text-gray-500 mb-4">
-                  Signed in as <span className="font-medium text-gray-700">{session.user.email}</span>. Files you save are synced privately to your account — reachable from any device you sign into, and not visible to anyone else.
+                <p className="text-base text-gray-700 mb-4">
+                  Signed in as <span className="font-medium text-gray-800">{session.user.email}</span>. Files you save are synced privately to your account — reachable from any device you sign into, and not visible to anyone else.
                 </p>
                 {isAdmin && (
                   <button
                     onClick={() => { setAccountDialogOpen(false); openStaffPanel(); }}
-                    className="w-full mb-2 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                    className="w-full mb-2 py-2 text-base font-medium text-gray-800 bg-white border border-gray-400 rounded-lg hover:bg-gray-50"
                   >
                     Manage Staff Access
                   </button>
                 )}
                 <button
                   onClick={() => { setAccountDialogOpen(false); openSharePanel(); }}
-                  className="w-full mb-2 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                  className="w-full mb-2 py-2 text-base font-medium text-gray-800 bg-white border border-gray-400 rounded-lg hover:bg-gray-50"
                 >
                   Share My Files
                 </button>
                 <button
                   onClick={handleSwitchAccount}
                   disabled={authSubmitting}
-                  className="w-full mb-2 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                  className="w-full mb-2 py-2 text-base font-medium text-gray-800 bg-white border border-gray-400 rounded-lg hover:bg-gray-50 disabled:opacity-50"
                 >
                   Switch Account
                 </button>
-                <button onClick={handleSignOut} className="w-full py-2 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100">
+                <button onClick={handleSignOut} className="w-full py-2 text-base font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100">
                   Sign Out
                 </button>
               </>
             ) : (
               <>
                 <h3 className="text-base font-semibold text-gray-900 mb-1 pr-6">Sign In to Sync</h3>
-                <p className="text-sm text-gray-500 mb-4">
+                <p className="text-base text-gray-700 mb-4">
                   Sign in with Google to sync your own files privately across devices. Only staff emails your admin has approved can sign in.
                 </p>
                 <button
                   onClick={handleGoogleSignIn}
                   disabled={authSubmitting}
-                  className="w-full flex items-center justify-center gap-2 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                  className="w-full flex items-center justify-center gap-2 py-2 text-base font-medium text-gray-800 bg-white border border-gray-400 rounded-lg hover:bg-gray-50 disabled:opacity-50"
                 >
                   <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true">
                     <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l5.7-5.7C34.6 6.1 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z" />
@@ -864,13 +864,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
                 </button>
               </>
             )}
-            <div className="mt-4 pt-4 border-t border-gray-100">
-              <p className="text-xs text-gray-400 mb-2">
+            <div className="mt-4 pt-4 border-t border-gray-300">
+              <p className="text-sm text-gray-600 mb-2">
                 Cloudflare Access checks your Google account before the app even loads — separate from the sign-in above. If it's stuck on the wrong account, log out of Access to pick a different one.
               </p>
               <a
                 href="/cdn-cgi/access/logout"
-                className="block w-full text-center py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                className="block w-full text-center py-2 text-base font-medium text-gray-800 bg-white border border-gray-400 rounded-lg hover:bg-gray-50"
               >
                 Log Out of Cloudflare Access
               </a>
@@ -883,7 +883,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40" onClick={() => setStaffPanelOpen(false)}>
           <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4 max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
             <h3 className="text-base font-semibold text-gray-900 mb-1">Staff Access</h3>
-            <p className="text-sm text-gray-500 mb-3">Only these emails can create an account and sync. Each person's saved files are private to them — this list controls who can sign in, not who can see whose data.</p>
+            <p className="text-base text-gray-700 mb-3">Only these emails can create an account and sync. Each person's saved files are private to them — this list controls who can sign in, not who can see whose data.</p>
             <div className="flex gap-2 mb-3">
               <input
                 type="email"
@@ -891,31 +891,31 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
                 onChange={e => setNewStaffEmail(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') handleAddStaff(); }}
                 placeholder="newstaff@example.com"
-                className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="flex-1 px-3 py-2 text-base border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
               <button
                 onClick={handleAddStaff}
                 disabled={staffSubmitting || !newStaffEmail.trim()}
-                className="px-3 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50"
+                className="px-3 py-2 text-base font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50"
               >
                 Add
               </button>
             </div>
             <div className="flex-1 overflow-y-auto -mx-2 px-2">
               {staffList.length === 0 ? (
-                <p className="text-sm text-gray-400 py-6 text-center">No staff yet.</p>
+                <p className="text-base text-gray-600 py-6 text-center">No staff yet.</p>
               ) : (
                 <ul className="divide-y divide-gray-100">
                   {staffList.map(s => (
                     <li key={s.email} className="flex items-center justify-between gap-3 py-2.5">
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">{s.email}</p>
-                        {s.isAdmin && <p className="text-xs text-primary-600">Admin</p>}
+                        <p className="text-base font-medium text-gray-900 truncate">{s.email}</p>
+                        {s.isAdmin && <p className="text-sm text-primary-600">Admin</p>}
                       </div>
                       {!s.isAdmin && (
                         <button
                           onClick={() => handleRemoveStaff(s.email)}
-                          className="px-2.5 py-1 text-xs font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 shrink-0"
+                          className="px-2.5 py-1 text-sm font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 shrink-0"
                         >
                           Remove
                         </button>
@@ -925,7 +925,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
                 </ul>
               )}
             </div>
-            <button onClick={() => setStaffPanelOpen(false)} className="mt-4 w-full py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+            <button onClick={() => setStaffPanelOpen(false)} className="mt-4 w-full py-2 text-base font-medium text-gray-800 bg-white border border-gray-400 rounded-lg hover:bg-gray-50">
               Close
             </button>
           </div>
@@ -936,7 +936,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40" onClick={() => setSharePanelOpen(false)}>
           <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4 max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
             <h3 className="text-base font-semibold text-gray-900 mb-1">Share My Files</h3>
-            <p className="text-sm text-gray-500 mb-3">Anyone you add here can view, edit, and delete all of your saved files — the same access you have. They must already be an approved user who can sign in. Remove them any time to cut off access immediately.</p>
+            <p className="text-base text-gray-700 mb-3">Anyone you add here can view, edit, and delete all of your saved files — the same access you have. They must already be an approved user who can sign in. Remove them any time to cut off access immediately.</p>
             <div className="flex gap-2 mb-3">
               <input
                 type="email"
@@ -944,27 +944,27 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
                 onChange={e => setNewShareEmail(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') handleAddShare(); }}
                 placeholder="colleague@example.com"
-                className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="flex-1 px-3 py-2 text-base border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
               <button
                 onClick={handleAddShare}
                 disabled={shareSubmitting || !newShareEmail.trim()}
-                className="px-3 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50"
+                className="px-3 py-2 text-base font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50"
               >
                 Share
               </button>
             </div>
             <div className="flex-1 overflow-y-auto -mx-2 px-2">
               {shareList.length === 0 ? (
-                <p className="text-sm text-gray-400 py-6 text-center">You haven't shared your files with anyone.</p>
+                <p className="text-base text-gray-600 py-6 text-center">You haven't shared your files with anyone.</p>
               ) : (
                 <ul className="divide-y divide-gray-100">
                   {shareList.map(s => (
                     <li key={s.id} className="flex items-center justify-between gap-3 py-2.5">
-                      <p className="text-sm font-medium text-gray-900 truncate">{s.sharedWithEmail}</p>
+                      <p className="text-base font-medium text-gray-900 truncate">{s.sharedWithEmail}</p>
                       <button
                         onClick={() => handleRemoveShare(s)}
-                        className="px-2.5 py-1 text-xs font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 shrink-0"
+                        className="px-2.5 py-1 text-sm font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 shrink-0"
                       >
                         Remove
                       </button>
@@ -973,7 +973,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
                 </ul>
               )}
             </div>
-            <button onClick={() => setSharePanelOpen(false)} className="mt-4 w-full py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+            <button onClick={() => setSharePanelOpen(false)} className="mt-4 w-full py-2 text-base font-medium text-gray-800 bg-white border border-gray-400 rounded-lg hover:bg-gray-50">
               Close
             </button>
           </div>
@@ -981,19 +981,19 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
       )}
 
       {isLocked && (
-        <div className="bg-amber-50 border-b border-amber-200 text-amber-800 text-sm px-4 py-2">
+        <div className="bg-amber-50 border-b border-amber-200 text-amber-800 text-base px-4 py-2">
           <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
             <span>
               🔒 Locked for editing — signed by <strong>{signedLabels.join(', ')}</strong>. Clear each of these signatures on the Report tab to make changes (everyone will need to sign again afterwards).
             </span>
-            <button onClick={handleClearAllSignatures} className="text-xs font-semibold text-amber-900 underline hover:no-underline whitespace-nowrap">
+            <button onClick={handleClearAllSignatures} className="text-sm font-semibold text-amber-900 underline hover:no-underline whitespace-nowrap">
               Clear All Signatures
             </button>
           </div>
         </div>
       )}
 
-      <header className="bg-white border-b border-gray-200 shadow-sm">
+      <header className="bg-white border-b border-gray-300 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <h1 className="text-xl font-bold text-gray-900">Property Inventory Handover</h1>
@@ -1003,7 +1003,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
               {cloudSyncEnabled && (
                 <button
                   onClick={() => setAccountDialogOpen(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-base text-gray-700 bg-white border border-gray-400 rounded-lg hover:bg-gray-50 transition-colors"
                   title={session ? `Signed in as ${session.user.email}` : 'Sign in to sync your Saved Files across devices'}
                 >
                   <span className={`w-1.5 h-1.5 rounded-full ${session ? 'bg-green-500' : 'bg-gray-300'}`} />
@@ -1012,21 +1012,21 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
               )}
               <button
                 onClick={openSavedFiles}
-                className="px-3 py-1.5 text-sm text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                className="px-3 py-1.5 text-base text-gray-700 bg-white border border-gray-400 rounded-lg hover:bg-gray-50 transition-colors"
                 title="Browse and reload files you've saved before"
               >
                 Saved Files
               </button>
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="px-3 py-1.5 text-sm text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                className="px-3 py-1.5 text-base text-gray-700 bg-white border border-gray-400 rounded-lg hover:bg-gray-50 transition-colors"
                 title="Load one file, or select several at once to import them all"
               >
                 Load File
               </button>
               <button
                 onClick={openSaveDialog}
-                className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
+                className="flex items-center gap-1.5 px-4 py-1.5 text-base font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -1035,7 +1035,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
               </button>
               <button
                 onClick={handleReset}
-                className="px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
+                className="px-3 py-1.5 text-base font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
                 title="Clear all data on this property — rooms, items, keys, photos, and signatures"
               >
                 Reset
@@ -1048,7 +1048,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
                 onClick={() => setMenuOpen(o => !o)}
                 aria-label="Open menu"
                 aria-expanded={menuOpen}
-                className="w-10 h-10 flex items-center justify-center text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                className="w-10 h-10 flex items-center justify-center text-gray-700 bg-white border border-gray-400 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
@@ -1058,11 +1058,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
               {menuOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
-                  <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1.5">
+                  <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-gray-300 rounded-lg shadow-lg z-50 py-1.5">
                     {cloudSyncEnabled && (
                       <button
                         onClick={() => { setMenuOpen(false); setAccountDialogOpen(true); }}
-                        className="w-full flex items-center gap-1.5 text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                        className="w-full flex items-center gap-1.5 text-left px-4 py-2.5 text-base text-gray-800 hover:bg-gray-50 transition-colors"
                       >
                         <span className={`w-1.5 h-1.5 rounded-full ${session ? 'bg-green-500' : 'bg-gray-300'}`} />
                         {session ? 'Account' : 'Sign In'}
@@ -1070,26 +1070,26 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
                     )}
                     <button
                       onClick={() => { setMenuOpen(false); openSaveDialog(); }}
-                      className="w-full text-left px-4 py-2.5 text-sm font-medium text-primary-700 hover:bg-primary-50 transition-colors"
+                      className="w-full text-left px-4 py-2.5 text-base font-medium text-primary-700 hover:bg-primary-50 transition-colors"
                     >
                       Save Work
                     </button>
                     <button
                       onClick={() => { setMenuOpen(false); openSavedFiles(); }}
-                      className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                      className="w-full text-left px-4 py-2.5 text-base text-gray-800 hover:bg-gray-50 transition-colors"
                     >
                       Saved Files
                     </button>
                     <button
                       onClick={() => { setMenuOpen(false); fileInputRef.current?.click(); }}
-                      className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                      className="w-full text-left px-4 py-2.5 text-base text-gray-800 hover:bg-gray-50 transition-colors"
                     >
                       Load File
                     </button>
-                    <div className="my-1 border-t border-gray-100" />
+                    <div className="my-1 border-t border-gray-300" />
                     <button
                       onClick={() => { setMenuOpen(false); handleReset(); }}
-                      className="w-full text-left px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+                      className="w-full text-left px-4 py-2.5 text-base font-medium text-red-600 hover:bg-red-50 transition-colors"
                     >
                       Reset
                     </button>
@@ -1101,17 +1101,17 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
         </div>
       </header>
 
-      <nav className="bg-white border-b border-gray-200">
+      <nav className="bg-white border-b border-gray-300">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex space-x-1 overflow-x-auto">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => onTabChange(tab.id)}
-                className={`px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+                className={`px-4 py-3 text-base font-medium whitespace-nowrap border-b-2 transition-colors ${
                   activeTab === tab.id
                     ? 'border-primary-500 text-primary-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    : 'border-transparent text-gray-700 hover:text-gray-800 hover:border-gray-400'
                 }`}
               >
                 {tab.label}

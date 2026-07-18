@@ -2,34 +2,20 @@ import React, { useRef, useState } from 'react';
 import { useProperty } from '../store/PropertyContext';
 import type { Photo } from '../types';
 import { GENERAL_AREA_LABEL, OTHERS_AREA_LABEL } from '../types';
-import { fd } from '../utils/date';
-import { normalizeImageOrientation, recompressDataUrl } from '../utils/image';
+import { normalizeImageOrientation } from '../utils/image';
 import { shareOrDownload, buildReportFilename } from '../utils/share';
-
-// Figure out the image format jsPDF needs from a data URL (defaults to JPEG for camera shots).
-const imgFormat = (dataUrl: string): string => {
-  const m = /^data:image\/(\w+);/.exec(dataUrl);
-  const ext = (m?.[1] || 'jpeg').toLowerCase();
-  return ext === 'jpg' ? 'JPEG' : ext.toUpperCase();
-};
-
-// How photos are arranged per PDF page, keyed by the "photos per page" choice.
-// Columns stay fixed at 2 and rows scale up, so each photo stays reasonably wide.
-const GRID_LAYOUTS: Record<number, { cols: number; rows: number }> = {
-  2: { cols: 2, rows: 1 },
-  4: { cols: 2, rows: 2 },
-  6: { cols: 2, rows: 3 },
-  8: { cols: 2, rows: 4 },
-};
+import { buildConditionReportPDF } from '../utils/reports';
+import { buildConditionReportExport, parseConditionReportImport, exchangeToPhotos } from '../utils/conditionReportExchange';
 
 // Note: this tab is intentionally independent of the move-in inventory's lock/signature
 // cycle (see isLocked in PropertyContext). Tenants get a warranty period after handover
 // to report defects, so this log needs to stay editable indefinitely — signing the
 // move-in inventory or the Takeover form never disables anything here.
 export const ConditionReportTab: React.FC = () => {
-  const { profile, addPhoto, updatePhoto, deletePhoto } = useProperty();
+  const { profile, addPhoto, addPhotos, updatePhoto, deletePhoto } = useProperty();
   const fileRef = useRef<HTMLInputElement>(null);
   const camRef = useRef<HTMLInputElement>(null);
+  const exchangeFileRef = useRef<HTMLInputElement>(null);
 
   // Built-in areas + any custom area names already used on past photos (so a custom
   // area you typed once shows back up in the picker without retyping it).
@@ -101,6 +87,35 @@ export const ConditionReportTab: React.FC = () => {
     showToast(`Downloaded ${selected.length} photo${selected.length === 1 ? '' : 's'} as a zip`);
   };
 
+  // Cross-app exchange with "Report Anything Anywhere Anytime" (same photo-capture/PDF
+  // architecture, separate app/storage). Export produces a JSON file that app can import,
+  // and vice versa — see utils/conditionReportExchange.ts for the shared format.
+  const handleExportConditionReport = async () => {
+    if (profile.photos.length === 0) { showToast('No photos to export yet'); return; }
+    const exchange = buildConditionReportExport(profile);
+    const filename = buildReportFilename(['Condition Report Export', profile.details.address], 'json');
+    const blob = new Blob([JSON.stringify(exchange, null, 2)], { type: 'application/json' });
+    const result = await shareOrDownload(blob, filename, 'application/json');
+    if (result !== 'cancelled') showToast(result === 'shared' ? 'Check the destination you chose' : 'Exported');
+  };
+
+  const handleImportConditionReportChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const text = ev.target?.result as string;
+      const exchange = parseConditionReportImport(text);
+      if (!exchange) { showToast("Not a recognized Condition Report file"); return; }
+      const photos = exchangeToPhotos(exchange);
+      if (photos.length === 0) { showToast('Nothing to import — no photos in that file'); return; }
+      addPhotos(photos);
+      showToast(`Imported ${photos.length} photo${photos.length === 1 ? '' : 's'}`);
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
   const pickArea = (val: string) => {
     setCurrentArea(val);
     if (typeof window !== 'undefined') window.localStorage.setItem(CURRENT_AREA_KEY, val);
@@ -147,98 +162,9 @@ export const ConditionReportTab: React.FC = () => {
     if (profile.photos.length === 0) { showToast('No photos to include yet'); return; }
     setGenerating(true);
     try {
-      const { default: jsPDF } = await import('jspdf');
-      // compress: true lets jsPDF Flate-compress embedded images instead of storing them raw.
-      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
-      const W = 210, H = 297, ML = 15, MR = 15, MT = 15, MB = 14, GAP = 6;
-      const CW = W - ML - MR;
-
-      let y = MT;
-      const np = () => { doc.addPage(); y = MT; };
-      const sf = (s: 'normal' | 'bold' | 'italic', sz: number, c = 0) => { doc.setFont('helvetica', s); doc.setFontSize(sz); doc.setTextColor(c); };
-      const rule = (w = 0.3, color = 180) => { doc.setDrawColor(color); doc.setLineWidth(w); doc.line(ML, y, W - MR, y); doc.setDrawColor(0); doc.setLineWidth(0.2); };
-
-      // Recompress every photo down to the PDF's size/quality budget before embedding —
-      // covers photos added under an older, larger/higher-quality setting (or from before
-      // this budget existed) so every export comes out small, not just newly-added photos.
-      const groups = orderedAreas
-        .map(area => ({ area, photos: profile.photos.filter(p => (p.area || GENERAL_AREA_LABEL) === area) }))
-        .filter(g => g.photos.length > 0);
-      const allPhotos = groups.flatMap(g => g.photos);
-      const compressed = await Promise.all(allPhotos.map(p => recompressDataUrl(p.dataUrl)));
-      const sizeMap = new Map(allPhotos.map((p, i) => [p.id, { w: compressed[i].w, h: compressed[i].h }]));
-      const pdfImageMap = new Map(allPhotos.map((p, i) => [p.id, compressed[i].dataUrl]));
-
-      // ── Cover header ───────────────────────────────────────────────────────
-      const addrParts = [profile.details.condoName, profile.details.address, profile.details.unitNo ? `Unit ${profile.details.unitNo}` : null].filter(Boolean);
-      sf('bold', 20, 0); doc.text('PROPERTY CONDITION REPORT', W / 2, y + 7, { align: 'center' }); y += 11;
-      if (addrParts.length) { sf('normal', 12, 60); doc.text(addrParts.join('  ·  '), W / 2, y, { align: 'center' }); y += 6.5; }
-      sf('normal', 10.5, 120); doc.text(`Generated ${fd(new Date().toISOString())}`, W / 2, y, { align: 'center' }); y += 6.5;
-      rule(0.5, 0); y += 8;
-
-      const { cols, rows } = GRID_LAYOUTS[photosPerPage];
-      const perPage = cols * rows;
-
-      groups.forEach((group, gi) => {
-        if (gi > 0) np();
-
-        for (let start = 0; start < group.photos.length; start += perPage) {
-          const isCont = start > 0;
-          if (isCont) np();
-
-          sf('bold', 14.5, 0);
-          doc.text(isCont ? `${group.area} (cont'd)` : group.area, ML, y + 5.5);
-          if (!isCont) {
-            sf('normal', 10.5, 120);
-            doc.text(`${group.photos.length} photo${group.photos.length !== 1 ? 's' : ''}`, W - MR, y + 5.5, { align: 'right' });
-          }
-          y += 9; rule(0.4, 0); y += 6;
-
-          const chunk = group.photos.slice(start, start + perPage);
-          const slotW = (CW - (cols - 1) * GAP) / cols;
-          const slotH = (H - MB - y - (rows - 1) * GAP) / rows;
-          const captionH = 16;
-          const maxImgH = slotH - captionH;
-
-          chunk.forEach((p, idx) => {
-            const col = idx % cols, row = Math.floor(idx / cols);
-            const sx = ML + col * (slotW + GAP), sy = y + row * (slotH + GAP);
-            const size = sizeMap.get(p.id) || { w: 1, h: 1 };
-            const scale = Math.min(slotW / size.w, maxImgH / size.h);
-            const iw = size.w * scale, ih = size.h * scale;
-            const ix = sx + (slotW - iw) / 2, iy = sy + (maxImgH - ih) / 2;
-
-            const pdfImage = pdfImageMap.get(p.id) || p.dataUrl;
-            doc.setDrawColor(210); doc.setLineWidth(0.2); doc.rect(sx, sy, slotW, maxImgH, 'S');
-            try { doc.addImage(pdfImage, imgFormat(pdfImage), ix, iy, iw, ih); } catch { /* skip unreadable image */ }
-
-            sf('normal', 9.5, 60);
-            const capLines = doc.splitTextToSize(p.caption || '—', slotW).slice(0, 2);
-            doc.text(capLines, sx, sy + maxImgH + 4.5);
-            sf('normal', 8, 140);
-            doc.text(fd(p.dateAdded), sx, sy + maxImgH + (capLines.length > 1 ? 13.5 : 9.5));
-          });
-
-          y += rows * slotH + (rows - 1) * GAP + 6;
-        }
-      });
-
-      // ── Footer on every page ─────────────────────────────────────────────
-      const tp = (doc as InstanceType<typeof jsPDF> & { internal: { getNumberOfPages: () => number } }).internal.getNumberOfPages();
-      for (let pg = 1; pg <= tp; pg++) {
-        doc.setPage(pg);
-        doc.setDrawColor(160); doc.setLineWidth(0.2); doc.line(ML, H - 10, W - MR, H - 10);
-        sf('normal', 8.5, 120);
-        doc.text(`Condition Report  ·  ${addrParts.join(' ')}`, ML, H - 5);
-        doc.text(`Page ${pg} of ${tp}`, W - MR, H - 5, { align: 'right' });
-      }
-
-      const tenantNames = profile.details.tenants.map(t => t.name).filter(Boolean).join(', ');
-      const filename = buildReportFilename(['Property Condition', profile.details.address, tenantNames]);
-      // Same fix as the Inventory Report: set the PDF's own /Title so iOS Safari suggests
-      // this filename instead of "Unknown" when saving/sharing from its blob-URL preview.
-      doc.setProperties({ title: filename.replace(/\.pdf$/i, '') });
-      const blob = doc.output('blob') as Blob;
+      const result = await buildConditionReportPDF(profile, photosPerPage);
+      if (!result) { showToast('No photos to include yet'); return; }
+      const { blob, filename } = result;
       const url = URL.createObjectURL(blob);
       setPreview(prev => { if (prev) URL.revokeObjectURL(prev.url); return { url, filename, blob }; });
     } finally {
@@ -300,6 +226,33 @@ export const ConditionReportTab: React.FC = () => {
             <div className="text-sm text-primary-500">Grouped by room — separate from the Report &amp; Takeover PDFs</div>
           </div>
         </button>
+      </div>
+
+      <div className="bg-white rounded-lg shadow p-4">
+        <h3 className="text-base font-semibold text-gray-900 mb-1">Exchange with Report Anything Anywhere</h3>
+        <p className="text-sm text-gray-700 mb-3">Move condition-report photos to or from the other app — useful if a photo shoot started there, or you want a copy here too.</p>
+        <input
+          ref={exchangeFileRef}
+          type="file"
+          accept=".json,application/json"
+          className="hidden"
+          onChange={handleImportConditionReportChange}
+        />
+        <div className="flex gap-2">
+          <button
+            onClick={() => { void handleExportConditionReport(); }}
+            disabled={profile.photos.length === 0}
+            className="flex-1 px-3 py-2 text-sm font-medium text-gray-800 bg-gray-100 rounded-md hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Export Photos
+          </button>
+          <button
+            onClick={() => exchangeFileRef.current?.click()}
+            className="flex-1 px-3 py-2 text-sm font-medium text-gray-800 bg-gray-100 rounded-md hover:bg-gray-200"
+          >
+            Import Photos
+          </button>
+        </div>
       </div>
 
       {profile.photos.length === 0 ? (

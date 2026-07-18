@@ -5,7 +5,8 @@ import { addSavedFile, getAllSavedFiles, deleteSavedFile, renameSavedFile, type 
 import { listCloudFiles, upsertCloudFile, deleteCloudFile, renameCloudFile, type CloudFileEntry } from '../store/cloudFiles';
 import { listStaff, addStaff, removeStaff, isStaffAdmin, type StaffEntry } from '../store/staffAccess';
 import { listMyShares, addShare, removeShare, type ShareEntry } from '../store/fileShares';
-import { shareOrDownload } from '../utils/share';
+import { shareOrDownload, isMobileDevice } from '../utils/share';
+import { buildInventoryReportPDF, buildConditionReportPDF } from '../utils/reports';
 
 // A row in the "Saved Files" list, merged from the local IndexedDB library and
 // (if signed in) the cloud table — one row per filename, tracking whichever
@@ -275,6 +276,35 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
     }
   };
 
+  // These live in the header menu (not just the Report/Condition Report tabs) so a report
+  // can be generated from wherever you are, without switching tabs first.
+  const handleGenerateInventoryReport = async () => {
+    // Must happen synchronously, before the `await buildInventoryReportPDF()` below breaks
+    // the user-gesture chain — otherwise iOS Safari's popup blocker silently swallows the
+    // preview tab. See utils/share.ts for the full explanation.
+    const previewWin = isMobileDevice() ? window.open('', '_blank') : null;
+    try {
+      const { blob, filename } = await buildInventoryReportPDF(profile);
+      await shareOrDownload(blob, filename, 'application/pdf', previewWin);
+    } catch {
+      previewWin?.close();
+      showToast("Couldn't generate the Inventory Report");
+    }
+  };
+
+  const handleGenerateConditionReport = async () => {
+    if (profile.photos.length === 0) { showToast('No condition photos to include yet'); return; }
+    const previewWin = isMobileDevice() ? window.open('', '_blank') : null;
+    try {
+      const result = await buildConditionReportPDF(profile);
+      if (!result) { previewWin?.close(); showToast('No condition photos to include yet'); return; }
+      await shareOrDownload(result.blob, result.filename, 'application/pdf', previewWin);
+    } catch {
+      previewWin?.close();
+      showToast("Couldn't generate the Condition Report");
+    }
+  };
+
   const handleSignOut = async () => {
     await signOut();
     setAccountDialogOpen(false);
@@ -506,7 +536,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
 
         if (files.length === 1) {
           const ok = importProfile(text);
-          showToast(ok ? `Loaded: ${file.name}` : 'Invalid file — could not load');
+          showToast(ok ? `Imported: ${file.name}` : 'Invalid file — could not import');
           if (ok) {
             // The old save handle belongs to a different file — forget it so "Save Work"
             // doesn't silently overwrite it, and prefill the dialog with this file's own name.
@@ -1011,6 +1041,21 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
                 </button>
               )}
               <button
+                onClick={handleGenerateInventoryReport}
+                className="px-3 py-1.5 text-base text-gray-700 bg-white border border-gray-400 rounded-lg hover:bg-gray-50 transition-colors"
+                title="Generate the Property Inventory Report PDF from wherever you are"
+              >
+                Inventory Report
+              </button>
+              <button
+                onClick={handleGenerateConditionReport}
+                className="px-3 py-1.5 text-base text-gray-700 bg-white border border-gray-400 rounded-lg hover:bg-gray-50 transition-colors"
+                title="Generate the Property Condition Report PDF from wherever you are"
+              >
+                Condition Report
+              </button>
+              <div className="w-px h-6 bg-gray-300 mx-1" />
+              <button
                 onClick={openSavedFiles}
                 className="px-3 py-1.5 text-base text-gray-700 bg-white border border-gray-400 rounded-lg hover:bg-gray-50 transition-colors"
                 title="Browse and reload files you've saved before"
@@ -1020,10 +1065,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
               <button
                 onClick={() => fileInputRef.current?.click()}
                 className="px-3 py-1.5 text-base text-gray-700 bg-white border border-gray-400 rounded-lg hover:bg-gray-50 transition-colors"
-                title="Load one file, or select several at once to import them all"
+                title="Import one file, or select several at once to import them all"
               >
-                Load File
+                Import File
               </button>
+              <div className="w-px h-6 bg-gray-300 mx-1" />
               <button
                 onClick={openSaveDialog}
                 className="flex items-center gap-1.5 px-4 py-1.5 text-base font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
@@ -1068,12 +1114,20 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
                         {session ? 'Account' : 'Sign In'}
                       </button>
                     )}
+                    <div className="my-1 border-t border-gray-300" />
                     <button
-                      onClick={() => { setMenuOpen(false); openSaveDialog(); }}
-                      className="w-full text-left px-4 py-2.5 text-base font-medium text-primary-700 hover:bg-primary-50 transition-colors"
+                      onClick={() => { setMenuOpen(false); handleGenerateInventoryReport(); }}
+                      className="w-full text-left px-4 py-2.5 text-base text-gray-800 hover:bg-gray-50 transition-colors"
                     >
-                      Save Work
+                      📄 Inventory Report
                     </button>
+                    <button
+                      onClick={() => { setMenuOpen(false); handleGenerateConditionReport(); }}
+                      className="w-full text-left px-4 py-2.5 text-base text-gray-800 hover:bg-gray-50 transition-colors"
+                    >
+                      📄 Condition Report
+                    </button>
+                    <div className="my-1 border-t border-gray-300" />
                     <button
                       onClick={() => { setMenuOpen(false); openSavedFiles(); }}
                       className="w-full text-left px-4 py-2.5 text-base text-gray-800 hover:bg-gray-50 transition-colors"
@@ -1084,7 +1138,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
                       onClick={() => { setMenuOpen(false); fileInputRef.current?.click(); }}
                       className="w-full text-left px-4 py-2.5 text-base text-gray-800 hover:bg-gray-50 transition-colors"
                     >
-                      Load File
+                      Import File
+                    </button>
+                    <div className="my-1 border-t border-gray-300" />
+                    <button
+                      onClick={() => { setMenuOpen(false); openSaveDialog(); }}
+                      className="w-full text-left px-4 py-2.5 text-base font-medium text-primary-700 hover:bg-primary-50 transition-colors"
+                    >
+                      Save Work
                     </button>
                     <div className="my-1 border-t border-gray-300" />
                     <button

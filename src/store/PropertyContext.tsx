@@ -61,6 +61,7 @@ interface PropertyContextType {
   setRoomItemList: (roomType: string, items: string[]) => void;
   renameGlobalItem: (oldName: string, newName: string) => void;
   addPhoto: (photo: Omit<Photo, 'id' | 'dateAdded'>) => void;
+  addPhotos: (photos: Array<Omit<Photo, 'id'>>) => void;
   updatePhoto: (id: string, u: Partial<Photo>) => void;
   deletePhoto: (id: string) => void;
   addSignature: (sig: Omit<Signature, 'id'>) => void;
@@ -177,6 +178,11 @@ export const PropertyProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   const addPhoto = useCallback((photo: Omit<Photo, 'id' | 'dateAdded'>) =>
     setProfile(p => t({ ...p, photos: [...p.photos, { ...photo, id: crypto.randomUUID(), dateAdded: new Date().toISOString() }] })), []);
+  // Bulk add — used by "Import Condition Report" so N photos land in one state update
+  // instead of N re-renders, and (unlike addPhoto) keeps each photo's own dateAdded
+  // rather than stamping "now", since these already have a real capture date.
+  const addPhotos = useCallback((photos: Array<Omit<Photo, 'id'>>) =>
+    setProfile(p => t({ ...p, photos: [...p.photos, ...photos.map(ph => ({ ...ph, id: crypto.randomUUID() }))] })), []);
   const updatePhoto = useCallback((id: string, u: Partial<Photo>) =>
     setProfile(p => t({ ...p, photos: p.photos.map(ph => ph.id === id ? { ...ph, ...u } : ph) })), []);
   const deletePhoto = useCallback((id: string) =>
@@ -251,7 +257,7 @@ export const PropertyProvider: React.FC<{ children: ReactNode }> = ({ children }
       addItem, updateItem, deleteItem,
       addKey, updateKey, deleteKey, setKeyItemList,
       setRoomItemList, renameGlobalItem,
-      addPhoto, updatePhoto, deletePhoto,
+      addPhoto, addPhotos, updatePhoto, deletePhoto,
       addSignature, deleteSignature, clearAllSignatures,
       isTakeoverLocked: (profile.takeover?.signatures.length || 0) > 0,
       updateTakeover, addTakeoverSignature, deleteTakeoverSignature, clearAllTakeoverSignatures,

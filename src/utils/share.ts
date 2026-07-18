@@ -63,30 +63,42 @@ export async function shareOrDownload(
   preOpenedWindow?: Window | null,
 ): Promise<ShareResult> {
   if (isMobileDevice()) {
-    if (isPreviewable(mimeType)) {
+    // Only take the "hand off to an already-open tab" path when a caller explicitly
+    // pre-opened one (see the doc comment above) — e.g. an immediate preview-on-generate
+    // flow with no in-app preview UI of its own. Every current caller shows its own
+    // in-app preview first and calls this only when the user taps an explicit
+    // "Download / Share" button, so this branch is effectively unused today, but is
+    // kept for that use case.
+    if (preOpenedWindow !== undefined && isPreviewable(mimeType)) {
       const url = URL.createObjectURL(blob);
-      const win = preOpenedWindow !== undefined ? preOpenedWindow : window.open(url, '_blank');
-      if (win) {
-        if (preOpenedWindow !== undefined) win.location.href = url;
+      if (preOpenedWindow) {
+        preOpenedWindow.location.href = url;
         return 'previewed'; // the tab now owns this URL — don't revoke it here
       }
       URL.revokeObjectURL(url);
-      // Popup blocked — fall through to a plain download below so the user still gets the file.
-    } else {
-      try {
-        const file = new File([blob], filename, { type: 'application/octet-stream' });
-        const nav = navigator as Navigator & {
-          canShare?: (data: { files?: File[] }) => boolean;
-          share?: (data: { files?: File[]; title?: string }) => Promise<void>;
-        };
-        if (nav.canShare && nav.share && nav.canShare({ files: [file] })) {
-          await nav.share({ files: [file], title: filename });
-          return 'shared';
-        }
-      } catch (err) {
-        if ((err as { name?: string })?.name === 'AbortError') return 'cancelled'; // user dismissed the share sheet
-        // Anything else (e.g. share targets rejecting the file) — fall through to a plain download.
+      // Popup blocked — fall through to a real share/download below so the user still gets the file.
+    }
+
+    // The actual "give me this file" request. Wrapping it in a `File` (not a bare
+    // `Blob`) is what lets iOS's share sheet / Save-to-Files suggest the *real*
+    // filename — a bare blob: URL opened in a second tab (the old behaviour here for
+    // PDFs/images) has no filename info at all, so iOS falls back to either the blob
+    // URL's own random UUID or "Unknown", which is exactly the bug this fixes.
+    try {
+      const file = new File([blob], filename, {
+        type: isPreviewable(mimeType) ? mimeType : 'application/octet-stream',
+      });
+      const nav = navigator as Navigator & {
+        canShare?: (data: { files?: File[] }) => boolean;
+        share?: (data: { files?: File[]; title?: string }) => Promise<void>;
+      };
+      if (nav.canShare && nav.share && nav.canShare({ files: [file] })) {
+        await nav.share({ files: [file], title: filename });
+        return 'shared';
       }
+    } catch (err) {
+      if ((err as { name?: string })?.name === 'AbortError') return 'cancelled'; // user dismissed the share sheet
+      // Anything else (e.g. share targets rejecting the file) — fall through to a plain download.
     }
   }
 

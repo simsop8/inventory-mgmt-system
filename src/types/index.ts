@@ -48,6 +48,7 @@ export interface Person {
 
 export interface AgentInfo {
   name: string;
+  companyName?: string;
   resLicenseNo?: string;
   servingFor?: 'landlord' | 'tenant' | 'both';
 }
@@ -175,6 +176,16 @@ export interface PropertyProfile {
   takeover: TakeoverData;
 }
 
+// Signature-block / label text for an agent — uses their company name when set
+// (so multi-agent forms read "ABC Realty" / "XYZ Property" instead of the generic
+// "Agent 1" / "Agent 2"), falling back to the generic label when no company name
+// has been entered.
+export function agentLabel(agent: AgentInfo | undefined, idx: number, total: number): string {
+  const company = agent?.companyName?.trim();
+  if (company) return company;
+  return total > 1 ? `Agent ${idx + 1}` : 'Agent';
+}
+
 export function detectRoomType(name: string): string {
   const trimmed = name.trim();
   if (STANDARD_INVENTORY[trimmed]) return trimmed;
@@ -250,7 +261,7 @@ export const STANDARD_INVENTORY: Record<string, string[]> = {
   'Balcony': ['Ceiling Fan', 'Outdoor Table', 'Outdoor Chairs', 'Clothes Rack', 'Laundry Rack'],
   'Study Room': ['Study Desk', 'Study Chair', 'Bookshelf', 'Filing Cabinet', 'Air Conditioner', 'Ceiling Fan', 'Curtains'],
   "Helper's Room": ['Bed Frame', 'Mattress', 'Wardrobe', 'Ceiling Fan', 'Curtains'],
-  'Others': ['Item'],
+  'Others': ['Item', 'Washer', 'Dryer'],
 };
 
 export const KEY_SECTION_LABELS: Record<KeySection, string> = {

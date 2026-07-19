@@ -167,6 +167,10 @@ export const PropertyDetails: React.FC = () => {
                     <input type="text" value={agent.name} onChange={e => updateAgent(String(idx), { name: e.target.value })} placeholder="Full name" className={inputCls} />
                   </div>
                   <div>
+                    <label className={labelCls}>Company Name</label>
+                    <input type="text" value={agent.companyName || ''} onChange={e => updateAgent(String(idx), { companyName: e.target.value })} placeholder="e.g. ABC Realty Pte Ltd" className={inputCls} />
+                  </div>
+                  <div>
                     <label className={labelCls}>RES Licence No.</label>
                     <input type="text" value={agent.resLicenseNo || ''} onChange={e => updateAgent(String(idx), { resLicenseNo: e.target.value })} placeholder="e.g. R012345A" className={inputCls} />
                   </div>

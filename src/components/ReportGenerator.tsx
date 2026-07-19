@@ -4,6 +4,7 @@ import { SigField } from './SigField';
 import { shareOrDownload } from '../utils/share';
 import { useDragReorder } from '../utils/dragReorder';
 import { buildInventoryReportPDF } from '../utils/reports';
+import { agentLabel } from '../types';
 
 export const ReportGenerator: React.FC = () => {
   const { profile, isLocked, addSignature, deleteSignature, reorderRoomTo, updateItem, updateKey } = useProperty();
@@ -27,7 +28,7 @@ export const ReportGenerator: React.FC = () => {
     })),
     ...agents.map((a, i) => ({
       role: `agent_${i}`,
-      label: agents.length > 1 ? `Agent ${i + 1}` : 'Agent',
+      label: agentLabel(a, i, agents.length),
       defaultName: a.name || '',
     })),
   ];

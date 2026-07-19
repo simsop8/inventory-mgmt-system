@@ -7,6 +7,7 @@ import { listStaff, addStaff, removeStaff, isStaffAdmin, type StaffEntry } from 
 import { listMyShares, addShare, removeShare, type ShareEntry } from '../store/fileShares';
 import { shareOrDownload } from '../utils/share';
 import { buildInventoryReportPDF, buildConditionReportPDF } from '../utils/reports';
+import { agentLabel } from '../types';
 
 // A row in the "Saved Files" list, merged from the local IndexedDB library and
 // (if signed in) the cloud table — one row per filename, tracking whichever
@@ -258,7 +259,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
     const idx = parseInt(s.role.split('_')[1], 10) || 0;
     if (s.role.startsWith('landlord_')) return profile.details.landlords.length > 1 ? `Landlord ${idx + 1}` : 'Landlord';
     if (s.role.startsWith('tenant_')) return profile.details.tenants.length > 1 ? `Tenant ${idx + 1}` : 'Tenant';
-    if (s.role.startsWith('agent_')) return (profile.details.agents || []).length > 1 ? `Agent ${idx + 1}` : 'Agent';
+    if (s.role.startsWith('agent_')) {
+      const agents = profile.details.agents || [];
+      return agentLabel(agents[idx], idx, agents.length);
+    }
     return s.name || 'Signature';
   });
 
@@ -1215,7 +1219,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
         </div>
       </nav>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      {/* Extra bottom padding (beyond the top's py-6) so the last item in a long,
+          expanded list — e.g. the last room's item form on the Rooms tab — has
+          breathing room to scroll clear of the viewport edge / mobile browser chrome
+          instead of sitting tight against the bottom. */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-28">
         {children}
       </main>
     </div>

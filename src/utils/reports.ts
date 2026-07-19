@@ -2,7 +2,7 @@
 // `profile` (no component state needed), so they can be triggered from anywhere: each
 // report's own tab, or the global header menu regardless of which tab is active.
 import type { PropertyProfile } from '../types';
-import { KEY_SECTION_LABELS, GENERAL_AREA_LABEL, OTHERS_AREA_LABEL } from '../types';
+import { KEY_SECTION_LABELS, GENERAL_AREA_LABEL, OTHERS_AREA_LABEL, agentLabel } from '../types';
 import type { KeySection } from '../types';
 import { fd } from './date';
 import { buildReportFilename } from './share';
@@ -30,7 +30,7 @@ export async function buildInventoryReportPDF(profile: PropertyProfile): Promise
     })),
     ...agents.map((a, i) => ({
       role: `agent_${i}`,
-      label: agents.length > 1 ? `Agent ${i + 1}` : 'Agent',
+      label: agentLabel(a, i, agents.length),
       defaultName: a.name || '',
     })),
   ];

@@ -4,7 +4,7 @@ import { SigField } from './SigField';
 import { fd } from '../utils/date';
 import { shareOrDownload } from '../utils/share';
 import type { TakeoverData, TakeoverKeyItem, TakeoverDocument, TakeoverDocumentStatus, TakeoverRoomNote, TakeoverDeduction } from '../types';
-import { TAKEOVER_KEY_PRESETS, TAKEOVER_DOCUMENT_PRESETS, TAKEOVER_AREA_PRESETS } from '../types';
+import { TAKEOVER_KEY_PRESETS, TAKEOVER_DOCUMENT_PRESETS, TAKEOVER_AREA_PRESETS, agentLabel } from '../types';
 
 const inputCls = 'w-full border border-gray-400 rounded-md px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-primary-500';
 // Field/section label styling echoes the SRI CRM form editor: small, bold,
@@ -94,7 +94,7 @@ export const TakeoverForm: React.FC = () => {
     })),
     ...agents.map((a, i) => ({
       role: `takeover_agent_${i}`,
-      label: agents.length > 1 ? `Agent ${i + 1}` : 'Agent',
+      label: agentLabel(a, i, agents.length),
       defaultName: a.name || '',
     })),
   ];
@@ -103,7 +103,7 @@ export const TakeoverForm: React.FC = () => {
     const idx = parseInt(s.role.split('_')[2], 10) || 0;
     if (s.role.startsWith('takeover_landlord_')) return profile.details.landlords.length > 1 ? `${llRole} ${idx + 1}` : llRole;
     if (s.role.startsWith('takeover_tenant_')) return profile.details.tenants.length > 1 ? `${teRole} ${idx + 1}` : teRole;
-    if (s.role.startsWith('takeover_agent_')) return agents.length > 1 ? `Agent ${idx + 1}` : 'Agent';
+    if (s.role.startsWith('takeover_agent_')) return agentLabel(agents[idx], idx, agents.length);
     return s.name || 'Signature';
   });
 

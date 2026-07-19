@@ -54,6 +54,7 @@ interface PropertyContextType {
   addItem: (roomId: string, item: Omit<InventoryItem, 'id'>) => void;
   updateItem: (roomId: string, itemId: string, u: Partial<InventoryItem>) => void;
   deleteItem: (roomId: string, itemId: string) => void;
+  reorderItemTo: (roomId: string, itemId: string, newIndex: number) => void;
   addKey: (key: Omit<KeyItem, 'id'>) => void;
   updateKey: (id: string, u: Partial<KeyItem>) => void;
   deleteKey: (id: string) => void;
@@ -150,6 +151,22 @@ export const PropertyProvider: React.FC<{ children: ReactNode }> = ({ children }
     setProfile(p => t({ ...p, rooms: p.rooms.map(r => r.id === roomId ? { ...r, items: r.items.map(i => i.id === itemId ? { ...i, ...u } : i) } : r) })), []);
   const deleteItem = useCallback((roomId: string, itemId: string) =>
     setProfile(p => t({ ...p, rooms: p.rooms.map(r => r.id === roomId ? { ...r, items: r.items.filter(i => i.id !== itemId) } : r) })), []);
+  // Moves an item directly to an arbitrary index within its room — used by
+  // press-and-drag reordering, mirroring reorderRoomTo above.
+  const reorderItemTo = useCallback((roomId: string, itemId: string, newIndex: number) =>
+    setProfile(p => t({
+      ...p, rooms: p.rooms.map(r => {
+        if (r.id !== roomId) return r;
+        const items = [...r.items];
+        const i = items.findIndex(it => it.id === itemId);
+        if (i < 0) return r;
+        const clamped = Math.max(0, Math.min(newIndex, items.length - 1));
+        if (clamped === i) return r;
+        const [moved] = items.splice(i, 1);
+        items.splice(clamped, 0, moved);
+        return { ...r, items };
+      }),
+    })), []);
 
   const addKey = useCallback((key: Omit<KeyItem, 'id'>) =>
     setProfile(p => t({ ...p, keys: [...p.keys, { ...key, id: crypto.randomUUID() }] })), []);
@@ -254,7 +271,7 @@ export const PropertyProvider: React.FC<{ children: ReactNode }> = ({ children }
       addTenant, updateTenant, removeTenant,
       addAgent, updateAgent, removeAgent,
       addRoom, updateRoom, deleteRoom, reorderRoom, reorderRoomTo,
-      addItem, updateItem, deleteItem,
+      addItem, updateItem, deleteItem, reorderItemTo,
       addKey, updateKey, deleteKey, setKeyItemList,
       setRoomItemList, renameGlobalItem,
       addPhoto, addPhotos, updatePhoto, deletePhoto,

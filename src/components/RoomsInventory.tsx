@@ -76,16 +76,29 @@ const ListManager: React.FC<{
 // ── Item row ────────────────────────────────────────────────────────────────
 interface ItemRowProps {
   item: InventoryItem;
+  dragging?: boolean;
+  onDragStart?: (e: React.PointerEvent) => void;
   onUpdate: (u: Partial<InventoryItem>) => void;
   onDelete: () => void;
 }
 
-const ItemRow: React.FC<ItemRowProps> = ({ item, onUpdate, onDelete }) => {
+const ItemRow: React.FC<ItemRowProps> = ({ item, dragging, onDragStart, onUpdate, onDelete }) => {
   const [editingName, setEditingName] = useState(false);
   const [nameVal, setNameVal] = useState(item.name);
   const commit = () => { if (nameVal.trim()) onUpdate({ name: nameVal.trim() }); else setNameVal(item.name); setEditingName(false); };
   return (
     <div className="flex items-center gap-2 p-2 bg-white border border-gray-300 rounded-lg">
+      {onDragStart && (
+        <button
+          type="button"
+          onPointerDown={onDragStart}
+          className={`w-5 h-8 flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded touch-none ${dragging ? 'cursor-grabbing text-primary-600' : 'cursor-grab'}`}
+          title="Press and drag to reorder"
+          aria-label="Drag to reorder item"
+        >
+          <span className="text-base leading-none select-none">⠿</span>
+        </button>
+      )}
       <div className="w-36 flex-shrink-0">
         {editingName ? (
           <input autoFocus type="text" value={nameVal} onChange={e => setNameVal(e.target.value)}
@@ -105,6 +118,48 @@ const ItemRow: React.FC<ItemRowProps> = ({ item, onUpdate, onDelete }) => {
         className="flex-1 border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 min-w-0" />
       <button onClick={onDelete} className="text-gray-600 hover:text-red-500 text-lg leading-none flex-shrink-0">×</button>
     </div>
+  );
+};
+
+// ── Item list (press-and-drag reorder within a room) ─────────────────────────
+const ItemsList: React.FC<{
+  items: InventoryItem[];
+  isLocked: boolean;
+  onUpdate: (itemId: string, u: Partial<InventoryItem>) => void;
+  onDelete: (itemId: string, name: string) => void;
+  onReorder: (itemId: string, newIndex: number) => void;
+}> = ({ items, isLocked, onUpdate, onDelete, onReorder }) => {
+  const rowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const { dragId, startDrag, getRowStyle } = useDragReorder(items.length, onReorder);
+
+  if (items.length === 0) return null;
+
+  return (
+    <>
+      <div className="flex items-center gap-2 px-2 pb-1">
+        <span className="w-5 flex-shrink-0"></span>
+        <span className="w-36 flex-shrink-0 text-sm font-medium text-gray-700">Item <span className="font-normal text-gray-600">(click to rename)</span></span>
+        <span className="flex-1 text-sm font-medium text-gray-700 min-w-0">Brand / Model</span>
+        <span className="w-14 text-sm font-medium text-gray-700 text-center flex-shrink-0">Qty</span>
+        <span className="flex-1 text-sm font-medium text-gray-700 min-w-0">Remarks</span>
+        <span className="w-5 flex-shrink-0"></span>
+      </div>
+      {items.map((item, ii) => (
+        <div
+          key={item.id}
+          ref={el => { if (el) rowRefs.current.set(item.id, el); else rowRefs.current.delete(item.id); }}
+          style={getRowStyle(item.id, ii)}
+        >
+          <ItemRow
+            item={item}
+            dragging={dragId === item.id}
+            onDragStart={e => { if (isLocked) return; startDrag(e, item.id, ii, rowRefs.current.get(item.id) || null); }}
+            onUpdate={u => onUpdate(item.id, u)}
+            onDelete={() => onDelete(item.id, item.name)}
+          />
+        </div>
+      ))}
+    </>
   );
 };
 
@@ -147,7 +202,7 @@ const AddItemForm: React.FC<{ itemList: string[]; existingItems: InventoryItem[]
 
 // ── Main component ──────────────────────────────────────────────────────────
 export const RoomsInventory: React.FC = () => {
-  const { profile, isLocked, addRoom, deleteRoom, updateRoom, addItem, updateItem, deleteItem, reorderRoomTo, setRoomItemList, renameGlobalItem } = useProperty();
+  const { profile, isLocked, addRoom, deleteRoom, updateRoom, addItem, updateItem, deleteItem, reorderItemTo, reorderRoomTo, setRoomItemList, renameGlobalItem } = useProperty();
   const [selectedRoom, setSelectedRoom] = useState('');
   const [customRoomName, setCustomRoomName] = useState('');
   const [isCustomRoom, setIsCustomRoom] = useState(false);
@@ -271,18 +326,13 @@ export const RoomsInventory: React.FC = () => {
                     onClose={() => setManagingListFor(null)}
                   />
                 )}
-                {room.items.length > 0 && (
-                  <div className="flex items-center gap-2 px-2 pb-1">
-                    <span className="w-36 flex-shrink-0 text-sm font-medium text-gray-700">Item <span className="font-normal text-gray-600">(click to rename)</span></span>
-                    <span className="flex-1 text-sm font-medium text-gray-700 min-w-0">Brand / Model</span>
-                    <span className="w-14 text-sm font-medium text-gray-700 text-center flex-shrink-0">Qty</span>
-                    <span className="flex-1 text-sm font-medium text-gray-700 min-w-0">Remarks</span>
-                    <span className="w-5 flex-shrink-0"></span>
-                  </div>
-                )}
-                {room.items.map(item => (
-                  <ItemRow key={item.id} item={item} onUpdate={u => updateItem(room.id, item.id, u)} onDelete={() => { if (confirm(`Delete "${item.name}"?`)) deleteItem(room.id, item.id); }} />
-                ))}
+                <ItemsList
+                  items={room.items}
+                  isLocked={isLocked}
+                  onUpdate={(itemId, u) => updateItem(room.id, itemId, u)}
+                  onDelete={(itemId, name) => { if (confirm(`Delete "${name}"?`)) deleteItem(room.id, itemId); }}
+                  onReorder={(itemId, newIndex) => reorderItemTo(room.id, itemId, newIndex)}
+                />
                 {addingTo === room.id ? (
                   <AddItemForm itemList={itemList} existingItems={room.items} onAdd={item => addItem(room.id, item)} onClose={() => setAddingTo(null)} />
                 ) : (

@@ -271,7 +271,7 @@ export const RoomsInventory: React.FC = () => {
             className="bg-white rounded-lg shadow overflow-hidden"
             style={getRowStyle(room.id, ri)}
           >
-            <div className="flex items-center gap-2 px-4 py-3 bg-gray-100 border-b border-gray-300">
+            <div className="flex items-center gap-2 px-4 py-3 bg-primary-700">
               <button
                 type="button"
                 onPointerDown={e => {
@@ -279,7 +279,7 @@ export const RoomsInventory: React.FC = () => {
                   setExpandedRoom(null); // collapse everyone first so every row shares one height during the drag
                   startDrag(e, room.id, ri, rowRefs.current.get(room.id) || null);
                 }}
-                className={`w-8 h-8 flex-shrink-0 flex items-center justify-center text-gray-700 hover:text-gray-800 hover:bg-gray-200 rounded touch-none ${dragId === room.id ? 'cursor-grabbing text-primary-600' : 'cursor-grab'}`}
+                className={`w-8 h-8 flex-shrink-0 flex items-center justify-center text-primary-100 hover:text-white hover:bg-primary-600 rounded touch-none ${dragId === room.id ? 'cursor-grabbing text-white bg-primary-600' : 'cursor-grab'}`}
                 title="Press and drag to reorder"
                 aria-label="Drag to reorder room"
               >
@@ -290,27 +290,27 @@ export const RoomsInventory: React.FC = () => {
                 <input autoFocus type="text" value={editingRoomName} onChange={e => setEditingRoomName(e.target.value)}
                   onBlur={() => commitRoomName(room.id)}
                   onKeyDown={e => { if (e.key === 'Enter') commitRoomName(room.id); if (e.key === 'Escape') setEditingRoomId(null); }}
-                  className="flex-1 border border-primary-400 rounded px-2 py-1 text-lg font-bold focus:outline-none"
+                  className="flex-1 border border-primary-300 rounded px-2 py-1 text-lg font-bold bg-white text-gray-900 focus:outline-none"
                 />
               ) : (
                 <div className="flex-1 flex items-center gap-2 cursor-pointer select-none" onClick={() => setExpandedRoom(expandedRoom === room.id ? null : room.id)}>
-                  <span className="text-gray-500 text-base">{expandedRoom === room.id ? '▼' : '▶'}</span>
+                  <span className="text-primary-200 text-base">{expandedRoom === room.id ? '▼' : '▶'}</span>
                   <span
-                    className={`text-lg font-bold text-gray-900 tracking-tight ${isLocked ? '' : 'hover:text-primary-600 cursor-text'}`}
+                    className={`text-lg font-bold text-white tracking-tight ${isLocked ? '' : 'hover:text-primary-100 cursor-text'}`}
                     onDoubleClick={e => { if (isLocked) return; e.stopPropagation(); startEditRoom(room.id, room.name); }}
                     title={isLocked ? undefined : 'Double-click to rename'}
                   >{room.name}</span>
-                  <span className="text-xs font-medium text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">{room.items.length} item{room.items.length !== 1 ? 's' : ''}</span>
+                  <span className="text-xs font-medium text-primary-100 bg-primary-800 px-2 py-0.5 rounded-full">{room.items.length} item{room.items.length !== 1 ? 's' : ''}</span>
                 </div>
               )}
 
               <button
                 onClick={e => { e.stopPropagation(); setManagingListFor(managingListFor === room.id ? null : room.id); if (expandedRoom !== room.id) setExpandedRoom(room.id); }}
-                className="text-sm text-gray-600 hover:text-gray-700 border border-gray-300 rounded px-2 py-0.5"
+                className="text-sm text-primary-50 hover:text-white border border-primary-400 hover:border-primary-200 hover:bg-primary-600 rounded px-2 py-0.5 transition-colors"
                 title={`Edit item template for ${roomType}`}
               >Edit List</button>
-              <button onClick={() => startEditRoom(room.id, room.name)} className="text-gray-600 hover:text-primary-500 text-sm px-1" title="Rename room">✎</button>
-              <button onClick={() => { if (confirm(`Delete "${room.name}"?`)) deleteRoom(room.id); }} className="text-gray-600 hover:text-red-500 text-xl px-1">×</button>
+              <button onClick={() => startEditRoom(room.id, room.name)} className="text-primary-100 hover:text-white text-sm px-1" title="Rename room">✎</button>
+              <button onClick={() => { if (confirm(`Delete "${room.name}"?`)) deleteRoom(room.id); }} className="text-primary-100 hover:text-red-300 text-xl px-1">×</button>
             </div>
 
             {expandedRoom === room.id && (

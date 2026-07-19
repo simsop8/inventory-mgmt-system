@@ -271,7 +271,7 @@ export const RoomsInventory: React.FC = () => {
             className="bg-white rounded-lg shadow overflow-hidden"
             style={getRowStyle(room.id, ri)}
           >
-            <div className="flex items-center gap-2 px-4 py-3 bg-gray-50 border-b border-gray-400">
+            <div className="flex items-center gap-2 px-4 py-3 bg-gray-100 border-b border-gray-300">
               <button
                 type="button"
                 onPointerDown={e => {
@@ -290,17 +290,17 @@ export const RoomsInventory: React.FC = () => {
                 <input autoFocus type="text" value={editingRoomName} onChange={e => setEditingRoomName(e.target.value)}
                   onBlur={() => commitRoomName(room.id)}
                   onKeyDown={e => { if (e.key === 'Enter') commitRoomName(room.id); if (e.key === 'Escape') setEditingRoomId(null); }}
-                  className="flex-1 border border-primary-400 rounded px-2 py-1 text-base font-semibold focus:outline-none"
+                  className="flex-1 border border-primary-400 rounded px-2 py-1 text-lg font-bold focus:outline-none"
                 />
               ) : (
                 <div className="flex-1 flex items-center gap-2 cursor-pointer select-none" onClick={() => setExpandedRoom(expandedRoom === room.id ? null : room.id)}>
-                  <span className="text-gray-600 text-sm">{expandedRoom === room.id ? '▼' : '▶'}</span>
+                  <span className="text-gray-500 text-base">{expandedRoom === room.id ? '▼' : '▶'}</span>
                   <span
-                    className={`font-semibold text-gray-900 ${isLocked ? '' : 'hover:text-primary-600 cursor-text'}`}
+                    className={`text-lg font-bold text-gray-900 tracking-tight ${isLocked ? '' : 'hover:text-primary-600 cursor-text'}`}
                     onDoubleClick={e => { if (isLocked) return; e.stopPropagation(); startEditRoom(room.id, room.name); }}
                     title={isLocked ? undefined : 'Double-click to rename'}
                   >{room.name}</span>
-                  <span className="text-sm text-gray-600 bg-gray-200 px-2 py-0.5 rounded-full">{room.items.length} item{room.items.length !== 1 ? 's' : ''}</span>
+                  <span className="text-xs font-medium text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">{room.items.length} item{room.items.length !== 1 ? 's' : ''}</span>
                 </div>
               )}
 

@@ -1219,11 +1219,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
         </div>
       </nav>
 
-      {/* Extra bottom padding (beyond the top's py-6) so the last item in a long,
-          expanded list — e.g. the last room's item form on the Rooms tab — has
+      {/* Generous bottom padding (beyond the top's pt-6) so the last item in a long,
+          expanded list — e.g. the last room's item form on the Rooms tab — has real
           breathing room to scroll clear of the viewport edge / mobile browser chrome
           instead of sitting tight against the bottom. */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-28">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-48">
         {children}
       </main>
     </div>

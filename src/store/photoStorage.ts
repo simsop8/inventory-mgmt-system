@@ -17,6 +17,7 @@ const STORAGE_PREFIX = 'storage:';
 interface RawPhoto {
   id: string;
   dataUrl: string;
+  annotatedDataUrl?: string;
   [key: string]: unknown;
 }
 
@@ -74,16 +75,29 @@ export async function dehydrateJson(json: string, ownerUserId: string): Promise<
     // (upsert: true means a redundant upload is harmless, just a bit slower).
   }
 
-  const photos = await Promise.all(profile.photos.map(async (p): Promise<RawPhoto> => {
-    if (!p?.dataUrl || !p.dataUrl.startsWith('data:')) return p; // already a storage ref, or nothing to do
-    const { blob, contentType } = dataUrlToBlob(p.dataUrl);
-    const name = `${p.id}.${extFromContentType(contentType)}`;
+  // Uploads a single data: URL to "<ownerUserId>/<baseName>.<ext>" and returns the
+  // "storage:<path>" reference, or the input unchanged if it isn't a data: URL at all
+  // (already a storage ref, or missing).
+  const uploadOne = async (dataUrl: string | undefined, baseName: string): Promise<string | undefined> => {
+    if (!dataUrl || !dataUrl.startsWith('data:')) return dataUrl;
+    const { blob, contentType } = dataUrlToBlob(dataUrl);
+    const name = `${baseName}.${extFromContentType(contentType)}`;
     const path = `${ownerUserId}/${name}`;
     if (!alreadyUploaded.has(name)) {
       const { error } = await supabase.storage.from(BUCKET).upload(path, blob, { contentType, upsert: true });
       if (error) throw error;
     }
-    return { ...p, dataUrl: `${STORAGE_PREFIX}${path}` };
+    return `${STORAGE_PREFIX}${path}`;
+  };
+
+  const photos = await Promise.all(profile.photos.map(async (p): Promise<RawPhoto> => {
+    // Annotated version uses a distinct "-annotated" suffix so it never collides with
+    // (or overwrites) the pristine original's own uploaded object.
+    const [dataUrl, annotatedDataUrl] = await Promise.all([
+      uploadOne(p.dataUrl, p.id),
+      uploadOne(p.annotatedDataUrl, `${p.id}-annotated`),
+    ]);
+    return { ...p, dataUrl: dataUrl ?? p.dataUrl, annotatedDataUrl };
   }));
   return JSON.stringify({ ...profile, photos });
 }
@@ -96,12 +110,20 @@ export async function hydrateJson(json: string): Promise<string> {
   const profile = JSON.parse(json) as RawProfile;
   if (!Array.isArray(profile.photos) || profile.photos.length === 0) return json;
 
-  const photos = await Promise.all(profile.photos.map(async (p): Promise<RawPhoto> => {
-    if (!p?.dataUrl || !p.dataUrl.startsWith(STORAGE_PREFIX)) return p; // inline already (legacy row), or nothing to do
-    const path = p.dataUrl.slice(STORAGE_PREFIX.length);
+  const downloadOne = async (dataUrl: string | undefined): Promise<string | undefined> => {
+    if (!dataUrl || !dataUrl.startsWith(STORAGE_PREFIX)) return dataUrl; // inline already (legacy row), or nothing to do
+    const path = dataUrl.slice(STORAGE_PREFIX.length);
     const { data, error } = await supabase.storage.from(BUCKET).download(path);
     if (error) throw error;
-    return { ...p, dataUrl: await blobToDataUrl(data) };
+    return blobToDataUrl(data);
+  };
+
+  const photos = await Promise.all(profile.photos.map(async (p): Promise<RawPhoto> => {
+    const [dataUrl, annotatedDataUrl] = await Promise.all([
+      downloadOne(p.dataUrl),
+      downloadOne(p.annotatedDataUrl),
+    ]);
+    return { ...p, dataUrl: dataUrl ?? p.dataUrl, annotatedDataUrl };
   }));
   return JSON.stringify({ ...profile, photos });
 }

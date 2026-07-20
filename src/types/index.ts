@@ -1,6 +1,12 @@
 export interface Photo {
   id: string;
   dataUrl: string;
+  // Flattened copy of dataUrl with hand-drawn markup (circles, arrows, etc.) baked in —
+  // set by the Annotate action on the Condition Report tab. Non-destructive: dataUrl
+  // itself is never touched, so re-annotating always starts from the clean original.
+  // Whenever this is present, it's what should actually be shown/exported/printed —
+  // dataUrl is kept purely as the pristine source to re-annotate from.
+  annotatedDataUrl?: string;
   caption?: string;
   // Which room/area this condition-report photo belongs to. Falls back to
   // GENERAL_AREA_LABEL when not tied to a specific room (entrance, exterior, etc.).

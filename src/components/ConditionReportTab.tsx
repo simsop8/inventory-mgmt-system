@@ -7,6 +7,11 @@ import { shareOrDownload, buildReportFilename, buildPropertyLabel } from '../uti
 import { buildConditionReportPDF } from '../utils/reports';
 import { buildConditionReportExport, parseConditionReportImport, exchangeToPhotos } from '../utils/conditionReportExchange';
 import { useDragReorder } from '../utils/dragReorder';
+import { PhotoAnnotator } from './PhotoAnnotator';
+
+// Whichever a photo should actually be shown/printed/exported as — the annotated
+// (marked-up) version when one exists, otherwise the plain original.
+const displayUrl = (photo: Photo) => photo.annotatedDataUrl || photo.dataUrl;
 
 // Note: this tab is intentionally independent of the move-in inventory's lock/signature
 // cycle (see isLocked in PropertyContext). Tenants get a warranty period after handover
@@ -63,6 +68,9 @@ export const ConditionReportTab: React.FC = () => {
   const [preview, setPreview] = useState<{ url: string; filename: string; blob: Blob } | null>(null);
   // Which photos are checked for bulk delete — keyed by Photo.id, across all areas.
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<Set<string>>(new Set());
+  // The photo currently open in the annotate modal, if any — always annotates from the
+  // pristine original (photo.dataUrl), never a previous annotation.
+  const [annotatingPhoto, setAnnotatingPhoto] = useState<Photo | null>(null);
   // Which area sections are collapsed — keyed by area name. Areas start collapsed (every
   // area present at mount is seeded in here) so a long room list opens as a scannable
   // list of headers; a newly-added area afterwards defaults to expanded since it's new
@@ -120,9 +128,10 @@ export const ConditionReportTab: React.FC = () => {
     // names within the zip without falling back to the photo's random internal ID.
     const areaCounts = new Map<string, number>();
     selected.forEach(photo => {
-      const m = /^data:image\/(\w+);base64,(.*)$/.exec(photo.dataUrl);
+      const url = displayUrl(photo);
+      const m = /^data:image\/(\w+);base64,(.*)$/.exec(url);
       const ext = (m?.[1] || 'jpg').toLowerCase();
-      const base64 = m?.[2] ?? photo.dataUrl.split(',')[1] ?? '';
+      const base64 = m?.[2] ?? url.split(',')[1] ?? '';
       const area = photo.area || GENERAL_AREA_LABEL;
       const seq = (areaCounts.get(area) || 0) + 1;
       areaCounts.set(area, seq);
@@ -199,12 +208,20 @@ export const ConditionReportTab: React.FC = () => {
   // no random photo ID, so what you get in your downloads folder actually reads as a
   // real name instead of "photo-a1b2c3d4.jpg".
   const handleDownload = (photo: Photo, area: string, indexInArea: number) => {
-    const m = /^data:image\/(\w+);base64,/.exec(photo.dataUrl);
+    const url = displayUrl(photo);
+    const m = /^data:image\/(\w+);base64,/.exec(url);
     const ext = (m?.[1] || 'jpg').toLowerCase();
     const filename = buildReportFilename([area, `Photo ${indexInArea + 1}`], ext === 'jpeg' ? 'jpg' : ext);
     const a = document.createElement('a');
-    a.href = photo.dataUrl; a.download = filename;
+    a.href = url; a.download = filename;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  };
+
+  const handleSaveAnnotation = (annotatedDataUrl: string) => {
+    if (!annotatingPhoto) return;
+    updatePhoto(annotatingPhoto.id, { annotatedDataUrl });
+    setAnnotatingPhoto(null);
+    showToast('Annotation saved');
   };
 
   const generateConditionReportPDF = async () => {
@@ -375,7 +392,7 @@ export const ConditionReportTab: React.FC = () => {
                         {/* object-contain (not cover) so tall screenshots/portrait photos show in full
                             instead of having their top/bottom cropped off to fill a fixed 16:9 box. */}
                         <div className="relative aspect-video bg-gray-100">
-                          <img src={photo.dataUrl} alt={photo.caption || area} className="w-full h-full object-contain" />
+                          <img src={displayUrl(photo)} alt={photo.caption || area} className="w-full h-full object-contain" />
                           <label className="absolute top-2 left-2 flex items-center justify-center w-6 h-6 bg-white/90 rounded shadow cursor-pointer">
                             <input type="checkbox" checked={selectedPhotoIds.has(photo.id)} onChange={() => togglePhotoSelection(photo.id)} />
                           </label>
@@ -397,6 +414,7 @@ export const ConditionReportTab: React.FC = () => {
                           />
                           <p className="text-sm text-gray-600">{new Date(photo.dateAdded).toLocaleString()}</p>
                           <div className="flex gap-2">
+                            <button onClick={() => setAnnotatingPhoto(photo)} className="flex-1 text-sm px-2 py-1 text-primary-700 bg-primary-50 rounded hover:bg-primary-100">Annotate</button>
                             <button onClick={() => handleDownload(photo, area, photoIdx)} className="flex-1 text-sm px-2 py-1 text-gray-700 bg-gray-100 rounded hover:bg-gray-200">Download</button>
                             <button onClick={() => { if (confirm('Delete this photo?')) deletePhoto(photo.id); }} className="flex-1 text-sm px-2 py-1 text-red-600 bg-red-50 rounded hover:bg-red-100">Delete</button>
                           </div>
@@ -496,6 +514,14 @@ export const ConditionReportTab: React.FC = () => {
           </div>
           <iframe title="Condition Report Preview" src={preview.url} className="flex-1 w-full bg-gray-100" />
         </div>
+      )}
+
+      {annotatingPhoto && (
+        <PhotoAnnotator
+          photoUrl={annotatingPhoto.dataUrl}
+          onSave={handleSaveAnnotation}
+          onClose={() => setAnnotatingPhoto(null)}
+        />
       )}
     </div>
   );

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useProperty } from '../store/PropertyContext';
 import { useAuth } from '../store/AuthContext';
 import { addSavedFile, getAllSavedFiles, deleteSavedFile, renameSavedFile, type SavedFileEntry } from '../store/fileHistory';
@@ -6,6 +6,7 @@ import { listCloudFiles, upsertCloudFile, deleteCloudFile, renameCloudFile, getC
 import { listStaff, addStaff, removeStaff, isStaffAdmin, type StaffEntry } from '../store/staffAccess';
 import { listMyShares, addShare, removeShare, type ShareEntry } from '../store/fileShares';
 import { shareOrDownload, buildPropertyLabel } from '../utils/share';
+import { buildInventoryReportPDF, buildConditionReportPDF } from '../utils/reports';
 import { agentLabel } from '../types';
 
 // A row in the "Saved Files" list, merged from the local IndexedDB library and
@@ -85,7 +86,7 @@ const stripJsonExt = (s: string) => s.replace(/\.json$/i, '');
 // Default save name convention: condo -> "Condo Name-#Unit-Tenant Name", landed -> "No &
 // Street Address-Tenant Name" (Singapore / postal code stripped either way — see
 // buildPropertyLabel). Falls back to date if both location and tenant are missing.
-const buildDefaultFilename = (profile: {
+type ConventionProfile = {
   details: {
     address: string;
     propertyType?: string;
@@ -94,7 +95,12 @@ const buildDefaultFilename = (profile: {
     postalCode?: string;
     tenants: { name: string }[];
   };
-}) => {
+};
+
+// The naming-convention part only — condo/landed label + tenant name(s), no fallback.
+// Returns null once there's genuinely nothing to build a name from yet (blank property),
+// which is what lets the header tell "no convention name yet" apart from "unsaved".
+const buildConventionName = (profile: ConventionProfile): string | null => {
   const location = sanitizeForFilename(buildPropertyLabel(profile.details));
   const tenantName = sanitizeForFilename(
     (profile.details.tenants || []).map(t => t.name).filter(Boolean).join(' & ')
@@ -102,8 +108,14 @@ const buildDefaultFilename = (profile: {
   if (location && tenantName) return `${location}-${tenantName}`;
   if (location) return location;
   if (tenantName) return tenantName;
-  return `property-inventory-${todayStamp()}`;
+  return null;
 };
+
+// Default save name convention: condo -> "Condo Name-#Unit-Tenant Name", landed -> "No &
+// Street Address-Tenant Name" (Singapore / postal code stripped either way — see
+// buildPropertyLabel). Falls back to date if both location and tenant are missing.
+const buildDefaultFilename = (profile: ConventionProfile) =>
+  buildConventionName(profile) || `property-inventory-${todayStamp()}`;
 
 type SaveWritable = { write: (d: string) => Promise<void>; close: () => Promise<void> };
 type SaveFileHandle = { name: string; createWritable: () => Promise<SaveWritable> };
@@ -115,6 +127,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
   const [toast, setToast] = useState<string | null>(null);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [saveFilename, setSaveFilename] = useState('');
+  // Single global "Export Reports" entry point — one button + a dialog to pick which
+  // PDF(s), instead of the Inventory/Condition Report PDFs only being reachable from
+  // their own tabs. Takeover Report isn't offered here: it needs a live signature from
+  // whoever's on that tab, so it stays a tab-only preview/generate flow.
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [exportSelection, setExportSelection] = useState({ inventory: true, condition: true });
+  const [exporting, setExporting] = useState(false);
   const [savedFilesOpen, setSavedFilesOpen] = useState(false);
   const [mergedFiles, setMergedFiles] = useState<MergedFileEntry[]>([]);
   const [backingUp, setBackingUp] = useState(false);
@@ -158,6 +177,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
       else window.localStorage.removeItem(LAST_SAVED_NAME_KEY);
     }
   };
+
+  // Recomputed on every profile change so the header always reflects the live naming
+  // convention — never a stale name left over from an older save or a legacy/shared file.
+  // Falls back to lastSavedName only until there's enough info (location or tenant) to
+  // build a real convention name.
+  const liveConventionName = useMemo(() => buildConventionName(profile), [profile]);
+  const headerFileName = liveConventionName || lastSavedName;
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -301,6 +327,30 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
       lastSavedHandleRef.current = null;
       setLastSavedName(null);
       showToast('All data cleared');
+    }
+  };
+
+  const handleExportReports = async () => {
+    if (!exportSelection.inventory && !exportSelection.condition) return;
+    setExporting(true);
+    try {
+      if (exportSelection.inventory) {
+        const { blob, filename } = await buildInventoryReportPDF(profile);
+        await shareOrDownload(blob, filename, 'application/pdf');
+      }
+      if (exportSelection.condition) {
+        const built = await buildConditionReportPDF(profile);
+        if (built) {
+          await shareOrDownload(built.blob, built.filename, 'application/pdf');
+        } else {
+          showToast('Condition Report has no photos to export');
+        }
+      }
+      setExportDialogOpen(false);
+    } catch {
+      showToast("Couldn't generate report — please try again");
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -746,6 +796,49 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
         </div>
       )}
 
+      {exportDialogOpen && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40" onClick={() => !exporting && setExportDialogOpen(false)}>
+          <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
+            <h3 className="text-base font-semibold text-gray-900 mb-1">Export Reports</h3>
+            <p className="text-base text-gray-700 mb-4">Choose which PDF(s) to generate and download. (Takeover Report is generated from its own tab, since it needs a live signature.)</p>
+            <div className="space-y-2 mb-5">
+              <label className="flex items-center gap-2.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
+                <input
+                  type="checkbox"
+                  checked={exportSelection.inventory}
+                  onChange={e => setExportSelection(s => ({ ...s, inventory: e.target.checked }))}
+                />
+                <span className="text-base text-gray-900">Inventory Report <span className="text-gray-600">— rooms, items, keys, signatures</span></span>
+              </label>
+              <label className="flex items-center gap-2.5 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
+                <input
+                  type="checkbox"
+                  checked={exportSelection.condition}
+                  onChange={e => setExportSelection(s => ({ ...s, condition: e.target.checked }))}
+                />
+                <span className="text-base text-gray-900">Condition Report <span className="text-gray-600">— photos by room, with captions</span></span>
+              </label>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => { void handleExportReports(); }}
+                disabled={exporting || (!exportSelection.inventory && !exportSelection.condition)}
+                className="flex-1 py-2 text-base font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50"
+              >
+                {exporting ? 'Generating…' : 'Download'}
+              </button>
+              <button
+                onClick={() => setExportDialogOpen(false)}
+                disabled={exporting}
+                className="flex-1 py-2 text-base font-medium text-gray-800 bg-white border border-gray-400 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {renameEntry && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40" onClick={closeRenameDialog}>
           <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
@@ -1117,8 +1210,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
           <div className="flex justify-between items-center py-4">
             <div className="min-w-0">
               <h1 className="text-xl font-bold text-gray-900">Property Inventory Handover</h1>
-              <p className="text-sm text-gray-600 truncate max-w-[60vw] sm:max-w-sm" title={lastSavedName ? `${lastSavedName}.json` : undefined}>
-                {lastSavedName ? `📄 ${lastSavedName}` : 'Unsaved — not yet saved'}
+              <p className="text-sm text-gray-600 truncate max-w-[45vw] sm:max-w-[220px]" title={headerFileName ? `${headerFileName}.json` : undefined}>
+                {headerFileName ? `📄 ${headerFileName}` : 'Unsaved — not yet saved'}
               </p>
             </div>
 
@@ -1145,6 +1238,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
                 </button>
               )}
               <div className="w-px h-6 bg-gray-300 mx-1" />
+              <button
+                onClick={() => setExportDialogOpen(true)}
+                className="px-3 py-1.5 text-base text-gray-700 bg-white border border-gray-400 rounded-lg hover:bg-gray-50 transition-colors"
+                title="Generate the Inventory Report and/or Condition Report PDFs"
+              >
+                Export Reports
+              </button>
               <button
                 onClick={openSavedFiles}
                 className="px-3 py-1.5 text-base text-gray-700 bg-white border border-gray-400 rounded-lg hover:bg-gray-50 transition-colors"
@@ -1214,6 +1314,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
                       </button>
                     )}
                     <div className="my-1 border-t border-gray-300" />
+                    <button
+                      onClick={() => { setMenuOpen(false); setExportDialogOpen(true); }}
+                      className="w-full text-left px-4 py-2.5 text-base text-gray-800 hover:bg-gray-50 transition-colors"
+                    >
+                      Export Reports
+                    </button>
                     <button
                       onClick={() => { setMenuOpen(false); openSavedFiles(); }}
                       className="w-full text-left px-4 py-2.5 text-base text-gray-800 hover:bg-gray-50 transition-colors"

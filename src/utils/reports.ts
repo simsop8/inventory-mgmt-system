@@ -398,7 +398,7 @@ export async function buildConditionReportPDF(profile: PropertyProfile, photosPe
     .map(area => ({ area, photos: profile.photos.filter(p => (p.area || GENERAL_AREA_LABEL) === area) }))
     .filter(g => g.photos.length > 0);
   const allPhotos = groups.flatMap(g => g.photos);
-  const compressed = await Promise.all(allPhotos.map(p => recompressDataUrl(p.dataUrl)));
+  const compressed = await Promise.all(allPhotos.map(p => recompressDataUrl(p.annotatedDataUrl || p.dataUrl)));
   const sizeMap = new Map(allPhotos.map((p, i) => [p.id, { w: compressed[i].w, h: compressed[i].h }]));
   const pdfImageMap = new Map(allPhotos.map((p, i) => [p.id, compressed[i].dataUrl]));
 

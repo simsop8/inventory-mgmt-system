@@ -41,7 +41,7 @@ export function buildConditionReportExport(profile: PropertyProfile): ConditionR
     photos: profile.photos.map(p => ({
       id: p.id,
       area: p.area || 'General',
-      dataUrl: p.dataUrl,
+      dataUrl: p.annotatedDataUrl || p.dataUrl,
       caption: p.caption,
       dateAdded: p.dateAdded,
     })),

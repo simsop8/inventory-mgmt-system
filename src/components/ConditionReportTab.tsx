@@ -3,7 +3,7 @@ import { useProperty } from '../store/PropertyContext';
 import type { Photo } from '../types';
 import { GENERAL_AREA_LABEL, OTHERS_AREA_LABEL } from '../types';
 import { normalizeImageOrientation } from '../utils/image';
-import { shareOrDownload, buildReportFilename } from '../utils/share';
+import { shareOrDownload, buildReportFilename, buildPropertyLabel } from '../utils/share';
 import { buildConditionReportPDF } from '../utils/reports';
 import { buildConditionReportExport, parseConditionReportImport, exchangeToPhotos } from '../utils/conditionReportExchange';
 
@@ -40,6 +40,17 @@ export const ConditionReportTab: React.FC = () => {
   const [preview, setPreview] = useState<{ url: string; filename: string; blob: Blob } | null>(null);
   // Which photos are checked for bulk delete — keyed by Photo.id, across all areas.
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<Set<string>>(new Set());
+  // Which area sections are collapsed — keyed by area name. Areas start expanded;
+  // collapsing one just hides its photo grid so a long room list is easier to scan.
+  const [collapsedAreas, setCollapsedAreas] = useState<Set<string>>(new Set());
+  const toggleAreaCollapsed = (area: string) => {
+    setCollapsedAreas(prev => {
+      const next = new Set(prev);
+      if (next.has(area)) next.delete(area);
+      else next.add(area);
+      return next;
+    });
+  };
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 2500); };
 
@@ -93,7 +104,7 @@ export const ConditionReportTab: React.FC = () => {
   const handleExportConditionReport = async () => {
     if (profile.photos.length === 0) { showToast('No photos to export yet'); return; }
     const exchange = buildConditionReportExport(profile);
-    const filename = buildReportFilename(['Condition Report Export', profile.details.address], 'json');
+    const filename = buildReportFilename(['Condition Report Export', buildPropertyLabel(profile.details)], 'json');
     const blob = new Blob([JSON.stringify(exchange, null, 2)], { type: 'application/json' });
     const result = await shareOrDownload(blob, filename, 'application/json');
     if (result !== 'cancelled') showToast(result === 'shared' ? 'Check the destination you chose' : 'Exported');
@@ -285,12 +296,19 @@ export const ConditionReportTab: React.FC = () => {
           {orderedAreas.map(area => {
             const areaPhotos = profile.photos.filter(p => (p.area || GENERAL_AREA_LABEL) === area);
             if (areaPhotos.length === 0) return null;
+            const isCollapsed = collapsedAreas.has(area);
             return (
               <div key={area} className="bg-white rounded-lg shadow overflow-hidden">
-                <div className="flex items-center gap-2 px-4 py-3 bg-gray-50 border-b border-gray-300">
+                <button
+                  onClick={() => toggleAreaCollapsed(area)}
+                  aria-expanded={!isCollapsed}
+                  className="w-full flex items-center gap-2 px-4 py-3 bg-gray-50 border-b border-gray-300 hover:bg-gray-100 transition-colors text-left"
+                >
+                  <span className="text-gray-500 text-sm shrink-0">{isCollapsed ? '▶' : '▼'}</span>
                   <span className="font-semibold text-gray-900">{area}</span>
                   <span className="text-sm text-gray-600 bg-gray-200 px-2 py-0.5 rounded-full">{areaPhotos.length} photo{areaPhotos.length !== 1 ? 's' : ''}</span>
-                </div>
+                </button>
+                {!isCollapsed && (
                 <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {areaPhotos.map(photo => (
                     <div key={photo.id} className={`border rounded-lg overflow-hidden ${selectedPhotoIds.has(photo.id) ? 'border-primary-400 ring-2 ring-primary-200' : 'border-gray-300'}`}>
@@ -326,6 +344,7 @@ export const ConditionReportTab: React.FC = () => {
                     </div>
                   ))}
                 </div>
+                )}
               </div>
             );
           })}

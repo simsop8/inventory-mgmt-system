@@ -5,7 +5,7 @@ import type { PropertyProfile } from '../types';
 import { KEY_SECTION_LABELS, GENERAL_AREA_LABEL, OTHERS_AREA_LABEL, agentLabel } from '../types';
 import type { KeySection } from '../types';
 import { fd } from './date';
-import { buildReportFilename } from './share';
+import { buildReportFilename, buildPropertyLabel } from './share';
 import { recompressDataUrl } from './image';
 
 const SECTIONS: KeySection[] = ['keys', 'access_cards', 'remote_controls', 'others', 'meter_readings'];
@@ -348,7 +348,7 @@ export async function buildInventoryReportPDF(profile: PropertyProfile): Promise
     doc.text(`Page ${pg} of ${tp}`, W - MR, H - 5, { align: 'right' });
   }
 
-  const filename = buildReportFilename(['Inventory Report', profile.details.address, tenantNames.join(', ')]);
+  const filename = buildReportFilename(['Inventory Report', buildPropertyLabel(profile.details), tenantNames.join(', ')]);
   // The mobile "preview" flow opens the PDF straight from a blob: URL, which carries no
   // filename metadata — iOS Safari falls back to naming the saved/shared file "Unknown"
   // unless the PDF's own /Title is set, which it then uses as the suggested filename.
@@ -467,7 +467,7 @@ export async function buildConditionReportPDF(profile: PropertyProfile, photosPe
   }
 
   const tenantNames = profile.details.tenants.map(t => t.name).filter(Boolean).join(', ');
-  const filename = buildReportFilename(['Property Condition', profile.details.address, tenantNames]);
+  const filename = buildReportFilename(['Condition Report', buildPropertyLabel(profile.details), tenantNames]);
   // Same fix as the Inventory Report: set the PDF's own /Title so iOS Safari suggests
   // this filename instead of "Unknown" when saving/sharing from its blob-URL preview.
   doc.setProperties({ title: filename.replace(/\.pdf$/i, '') });

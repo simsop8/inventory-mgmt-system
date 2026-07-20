@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useProperty } from '../store/PropertyContext';
 import { SigField } from './SigField';
 import { fd } from '../utils/date';
-import { shareOrDownload } from '../utils/share';
+import { shareOrDownload, buildReportFilename, buildPropertyLabel } from '../utils/share';
 import type { TakeoverData, TakeoverKeyItem, TakeoverDocument, TakeoverDocumentStatus, TakeoverRoomNote, TakeoverDeduction } from '../types';
 import { TAKEOVER_KEY_PRESETS, TAKEOVER_DOCUMENT_PRESETS, TAKEOVER_AREA_PRESETS, agentLabel } from '../types';
 
@@ -335,7 +335,8 @@ export const TakeoverForm: React.FC = () => {
       doc.text(`Page ${pg} of ${tp}`, W - MR, H - 5, { align: 'right' });
     }
 
-    const filename = `${(profile.details.address || 'property-takeover').replace(/[^a-z0-9]/gi, '_').slice(0, 50)}-takeover.pdf`;
+    const takeoverTenantNames = profile.details.tenants.map(t => t.name).filter(Boolean).join(', ');
+    const filename = buildReportFilename(['Takeover Report', buildPropertyLabel(profile.details), takeoverTenantNames]);
     // Same fix as the other reports: set the PDF's own /Title so iOS Safari suggests this
     // filename instead of "Unknown" when saving/sharing from its blob-URL preview.
     doc.setProperties({ title: filename.replace(/\.pdf$/i, '') });

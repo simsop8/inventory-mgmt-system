@@ -5,7 +5,7 @@ import { addSavedFile, getAllSavedFiles, deleteSavedFile, renameSavedFile, type 
 import { listCloudFiles, upsertCloudFile, deleteCloudFile, renameCloudFile, type CloudFileEntry } from '../store/cloudFiles';
 import { listStaff, addStaff, removeStaff, isStaffAdmin, type StaffEntry } from '../store/staffAccess';
 import { listMyShares, addShare, removeShare, type ShareEntry } from '../store/fileShares';
-import { shareOrDownload } from '../utils/share';
+import { shareOrDownload, buildPropertyLabel } from '../utils/share';
 import { buildInventoryReportPDF, buildConditionReportPDF } from '../utils/reports';
 import { agentLabel } from '../types';
 
@@ -71,14 +71,25 @@ const sanitizeForFilename = (s: string) =>
 // Drop a trailing ".json" so a loaded filename can be reused as the Save dialog's default.
 const stripJsonExt = (s: string) => s.replace(/\.json$/i, '');
 
-// Default save name convention: "address-tenant name" (falls back to date if either is missing).
-const buildDefaultFilename = (profile: { details: { address: string; tenants: { name: string }[] } }) => {
-  const address = sanitizeForFilename(profile.details.address || '');
+// Default save name convention: condo -> "Condo Name-#Unit-Tenant Name", landed -> "No &
+// Street Address-Tenant Name" (Singapore / postal code stripped either way — see
+// buildPropertyLabel). Falls back to date if both location and tenant are missing.
+const buildDefaultFilename = (profile: {
+  details: {
+    address: string;
+    propertyType?: string;
+    condoName?: string;
+    unitNo?: string;
+    postalCode?: string;
+    tenants: { name: string }[];
+  };
+}) => {
+  const location = sanitizeForFilename(buildPropertyLabel(profile.details));
   const tenantName = sanitizeForFilename(
     (profile.details.tenants || []).map(t => t.name).filter(Boolean).join(' & ')
   );
-  if (address && tenantName) return `${address}-${tenantName}`;
-  if (address) return address;
+  if (location && tenantName) return `${location}-${tenantName}`;
+  if (location) return location;
   if (tenantName) return tenantName;
   return `property-inventory-${todayStamp()}`;
 };
@@ -96,6 +107,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
   const [savedFilesOpen, setSavedFilesOpen] = useState(false);
   const [mergedFiles, setMergedFiles] = useState<MergedFileEntry[]>([]);
   const [backingUp, setBackingUp] = useState(false);
+  const [syncingToCloud, setSyncingToCloud] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [generatingReport, setGeneratingReport] = useState(false);
   const [reportPreview, setReportPreview] = useState<{ url: string; filename: string; blob: Blob } | null>(null);
@@ -377,28 +389,51 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
   const syncSuffix = (cloudOk: boolean | null) =>
     cloudOk === true ? ' · synced to cloud' : cloudOk === false ? ' · cloud sync failed (saved locally)' : '';
 
+  // Explicit, user-triggered push of every locally-saved file up to the cloud — the
+  // counterpart to local-first saving. Saves never wait on the network, so this is how
+  // you catch the cloud back up after working offline (or any time you just want to be
+  // sure everything's mirrored). Best-effort per file: one failure doesn't stop the rest.
+  const syncAllToCloud = async () => {
+    if (!cloudSyncEnabled || !session) return;
+    setSyncingToCloud(true);
+    try {
+      const local = await getAllSavedFiles();
+      if (local.length === 0) { showToast('No saved files to sync yet'); return; }
+      let ok = 0, fail = 0;
+      for (const entry of local) {
+        try { await upsertCloudFile(entry.filename, entry.json); ok++; }
+        catch { fail++; }
+      }
+      showToast(fail === 0
+        ? `Synced ${ok} file${ok === 1 ? '' : 's'} to cloud`
+        : `Synced ${ok} file${ok === 1 ? '' : 's'} · ${fail} failed (offline?)`);
+      void refreshSavedFiles();
+    } finally {
+      setSyncingToCloud(false);
+    }
+  };
+
   const confirmSave = async () => {
     const rawName = saveFilename.trim() || `property-inventory-${todayStamp()}`;
     const finalName = rawName.endsWith('.json') ? rawName : `${rawName}.json`;
     const json = exportProfile();
 
-    // Signed in: the cloud copy is the durable save — skip the file-system
-    // picker / share sheet entirely, on desktop AND mobile. Save Work becomes
-    // a single click. Explicitly exporting to a folder or another cloud
-    // provider happens later, on demand, via the Download button in Saved
-    // Files — not automatically on every save.
+    // Signed in: local storage (IndexedDB) is the durable save and always completes
+    // instantly, whether online or not — Save Work never waits on the network, so a
+    // spotty/no-internet connection can't make saving feel slow or delayed. Cloud sync
+    // (if enabled) is a background, best-effort push after the fact; it never blocks
+    // or gates the save, and can also be triggered on demand any time via "Sync to
+    // Cloud" in the header.
     if (cloudSyncEnabled && session) {
       await addSavedFile(finalName, json);
-      const cloudOk = await trySync(finalName, json);
-      if (cloudOk) {
-        lastSavedHandleRef.current = null;
-        setLastSavedName(rawName);
-        setSaveDialogOpen(false);
-        showToast(`Saved: ${finalName}${syncSuffix(cloudOk)}`);
-        return;
-      }
-      // Signed in but the cloud save failed (offline?) — fall through to the
-      // file-system fallback below so nothing is lost.
+      lastSavedHandleRef.current = null;
+      setLastSavedName(rawName);
+      setSaveDialogOpen(false);
+      showToast(`Saved: ${finalName}`);
+      void trySync(finalName, json).then(cloudOk => {
+        if (cloudOk === false) showToast(`${finalName} saved locally — cloud sync failed (offline?). Try "Sync to Cloud" later.`);
+      });
+      return;
     }
 
     // Same name as the last save this session — overwrite that same file handle directly,
@@ -1061,7 +1096,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
       <header className="bg-white border-b border-gray-300 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
-            <h1 className="text-xl font-bold text-gray-900">Property Inventory Handover</h1>
+            <div className="min-w-0">
+              <h1 className="text-xl font-bold text-gray-900">Property Inventory Handover</h1>
+              <p className="text-sm text-gray-600 truncate max-w-[50vw] sm:max-w-xs" title={lastSavedName ? `${lastSavedName}.json` : undefined}>
+                {lastSavedName ? `📄 ${lastSavedName}.json` : 'Unsaved — not yet saved'}
+              </p>
+            </div>
 
             {/* Desktop/tablet: full button row, unchanged. */}
             <div className="hidden sm:flex items-center gap-2">
@@ -1073,6 +1113,16 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
                 >
                   <span className={`w-1.5 h-1.5 rounded-full ${session ? 'bg-green-500' : 'bg-gray-300'}`} />
                   {session ? 'Account' : 'Sign In'}
+                </button>
+              )}
+              {cloudSyncEnabled && session && (
+                <button
+                  onClick={() => { void syncAllToCloud(); }}
+                  disabled={syncingToCloud}
+                  className="px-3 py-1.5 text-base text-gray-700 bg-white border border-gray-400 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                  title="Push every file saved on this device up to the cloud — saves themselves are always local-first and never wait on this"
+                >
+                  {syncingToCloud ? 'Syncing…' : '☁ Sync to Cloud'}
                 </button>
               )}
               <button
@@ -1149,6 +1199,15 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
                       >
                         <span className={`w-1.5 h-1.5 rounded-full ${session ? 'bg-green-500' : 'bg-gray-300'}`} />
                         {session ? 'Account' : 'Sign In'}
+                      </button>
+                    )}
+                    {cloudSyncEnabled && session && (
+                      <button
+                        onClick={() => { setMenuOpen(false); void syncAllToCloud(); }}
+                        disabled={syncingToCloud}
+                        className="w-full text-left px-4 py-2.5 text-base text-gray-800 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                      >
+                        {syncingToCloud ? '☁ Syncing…' : '☁ Sync to Cloud'}
                       </button>
                     )}
                     <div className="my-1 border-t border-gray-300" />

@@ -42,6 +42,38 @@ export function buildReportFilename(parts: Array<string | null | undefined>, ext
   return `${base}.${extension}`;
 }
 
+// The "location" portion of a save/report filename, per the naming convention:
+// unit numbers repeat across every condo in Singapore, so a unit number alone is
+// meaningless in a filename — condos are identified by "Condo Name-#Unit" instead.
+// Landed properties have no condo name, so the block-and-street address stands in
+// for it. Either way, "Singapore" and the postal code are stripped out — the
+// postal-code lookup auto-fills them onto the address field, but they're just
+// clutter in a filename.
+export function buildPropertyLabel(details: {
+  propertyType?: string;
+  condoName?: string;
+  unitNo?: string;
+  address?: string;
+  postalCode?: string;
+}): string {
+  if (details.propertyType === 'condo' && details.condoName) {
+    return [details.condoName, details.unitNo ? `#${details.unitNo}` : null].filter(Boolean).join('-');
+  }
+  return stripSingaporePostal(details.address, details.postalCode);
+}
+
+// Removes a trailing/embedded "Singapore 123456" (or a bare postal code) from an
+// address string, e.g. "12 Jalan Besar, Singapore 123456" -> "12 Jalan Besar".
+function stripSingaporePostal(address = '', postalCode = ''): string {
+  let a = address;
+  if (postalCode) {
+    a = a.replace(new RegExp(`,?\\s*Singapore\\s*${postalCode}\\b`, 'i'), '');
+    a = a.replace(new RegExp(`,?\\s*\\b${postalCode}\\b`), '');
+  }
+  a = a.replace(/,?\s*\bSingapore\b/i, '');
+  return a.replace(/\s*,\s*$/, '').replace(/\s+/g, ' ').trim();
+}
+
 const PREVIEWABLE_MIME_PREFIXES = ['application/pdf', 'image/'];
 function isPreviewable(mimeType: string): boolean {
   return PREVIEWABLE_MIME_PREFIXES.some(p => mimeType.startsWith(p));

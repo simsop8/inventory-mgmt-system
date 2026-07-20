@@ -242,7 +242,7 @@ export const ReportGenerator: React.FC = () => {
       </div>
 
       <div className="bg-white rounded-lg shadow p-4">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Generate Report</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Generate Inventory Report</h2>
         <p className="text-sm text-gray-600 mb-3">To save or load this property's data, use "Save Work" / "Import File" / "Saved Files" at the top of the page. To clear everything and start over, use "Reset" at the top of the page.</p>
         <button onClick={() => { void generatePDF(); }} disabled={generating} className="flex items-center gap-3 p-4 bg-primary-50 rounded-lg hover:bg-primary-100 transition-colors text-left w-full sm:w-auto sm:min-w-[280px] disabled:opacity-50 disabled:cursor-not-allowed">
           <span className="text-2xl">📄</span>

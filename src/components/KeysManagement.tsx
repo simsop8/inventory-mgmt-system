@@ -235,9 +235,12 @@ const AddKeyForm: React.FC<{ section: KeySection; itemList: string[]; onAdd: (it
 
 // ── Main component ──────────────────────────────────────────────────────────
 export const KeysManagement: React.FC = () => {
-  const { profile, isLocked, addKey, updateKey, deleteKey, setKeyItemList } = useProperty();
+  const { profile, isLocked, addKey, updateKey, deleteKey, setKeyItemList, updateDetails } = useProperty();
   const [addingTo, setAddingTo] = useState<KeySection | null>(null);
   const [managingList, setManagingList] = useState<KeySection | null>(null);
+  // Accordion — same one-open-at-a-time pattern as the Rooms tab. Sections start
+  // collapsed; click a header to expand it.
+  const [expandedSection, setExpandedSection] = useState<KeySection | null>(null);
 
   const lists = { ...DEFAULT_KEY_ITEM_LISTS, ...(profile.keyItemLists || {}) };
 
@@ -247,43 +250,70 @@ export const KeysManagement: React.FC = () => {
         const items = profile.keys.filter(k => k.section === section);
         const itemList = lists[section] || [];
         const hasDropdown = SECTIONS_WITH_DROPDOWNS.includes(section);
+        const isExpanded = expandedSection === section;
+        const expand = () => setExpandedSection(section);
         return (
           <div key={section} className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-300 bg-gray-50">
-              <div className="flex items-center gap-2">
-                <h3 className="font-semibold text-gray-900 text-base">{KEY_SECTION_LABELS[section]}</h3>
-                {items.length > 0 && <span className="text-sm text-gray-600 bg-gray-200 px-2 py-0.5 rounded-full">{items.length}</span>}
-              </div>
-              <div className="flex items-center gap-2">
-                {hasDropdown && (
-                  <button onClick={() => setManagingList(managingList === section ? null : section)} className="text-sm text-gray-600 hover:text-gray-700 border border-gray-300 rounded px-2 py-0.5" title="Edit dropdown list">Edit List</button>
+            <div className="flex items-center gap-2 px-4 py-3 bg-primary-700">
+              <div
+                className="flex-1 flex items-center gap-2 cursor-pointer select-none"
+                onClick={() => setExpandedSection(isExpanded ? null : section)}
+              >
+                <span className="text-primary-200 text-base">{isExpanded ? '▼' : '▶'}</span>
+                <span className="text-lg font-bold text-white tracking-tight">{KEY_SECTION_LABELS[section]}</span>
+                {items.length > 0 && (
+                  <span className="text-xs font-medium text-primary-100 bg-primary-800 px-2 py-0.5 rounded-full">{items.length}</span>
                 )}
-                <button onClick={() => setAddingTo(addingTo === section ? null : section)} className="text-base text-primary-600 hover:text-primary-700 font-medium">+ Add</button>
               </div>
-            </div>
-            <div className="p-4">
-              {items.length === 0 && addingTo !== section && managingList !== section && (
-                <p className="text-sm text-gray-600 text-center py-2">No entries yet.</p>
+              {hasDropdown && (
+                <button
+                  onClick={e => { e.stopPropagation(); setManagingList(managingList === section ? null : section); if (!isExpanded) expand(); }}
+                  className="text-sm text-primary-50 hover:text-white border border-primary-400 hover:border-primary-200 hover:bg-primary-600 rounded px-2 py-0.5 transition-colors"
+                  title={`Edit dropdown list for ${KEY_SECTION_LABELS[section]}`}
+                >Edit List</button>
               )}
-              <div className="space-y-2">
-                {items.map(item => (
-                  <KeyRow key={item.id} item={item} itemList={itemList}
-                    onUpdate={u => updateKey(item.id, u)}
-                    onDelete={() => { if (confirm('Delete this entry?')) deleteKey(item.id); }}
+              <button
+                onClick={e => { e.stopPropagation(); setAddingTo(addingTo === section ? null : section); if (!isExpanded) expand(); }}
+                className="text-sm text-primary-50 hover:text-white border border-primary-400 hover:border-primary-200 hover:bg-primary-600 rounded px-2 py-0.5 transition-colors"
+              >+ Add</button>
+            </div>
+            {isExpanded && (
+              <div className="p-4 bg-gray-50 space-y-2">
+                {items.length === 0 && addingTo !== section && managingList !== section && (
+                  <p className="text-sm text-gray-600 text-center py-2">No entries yet.</p>
+                )}
+                <div className="space-y-2">
+                  {items.map(item => (
+                    <KeyRow key={item.id} item={item} itemList={itemList}
+                      onUpdate={u => updateKey(item.id, u)}
+                      onDelete={() => { if (confirm('Delete this entry?')) deleteKey(item.id); }}
+                    />
+                  ))}
+                </div>
+                {managingList === section && (
+                  <ListManager
+                    items={itemList}
+                    onSave={newList => setKeyItemList(section, newList)}
+                    onClose={() => setManagingList(null)}
                   />
-                ))}
+                )}
+                {addingTo === section && (
+                  <AddKeyForm section={section} itemList={itemList} onAdd={item => { addKey(item); setAddingTo(null); }} onClose={() => setAddingTo(null)} />
+                )}
+                {section === 'others' && (
+                  <div className="pt-3 mt-1 border-t border-gray-300">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Additional Notes</label>
+                    <textarea
+                      value={profile.details.notes || ''}
+                      onChange={e => updateDetails({ notes: e.target.value })}
+                      rows={4}
+                      placeholder="Any additional notes..."
+                      className="w-full border border-gray-400 rounded-md px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+                )}
               </div>
-              {managingList === section && (
-                <ListManager
-                  items={itemList}
-                  onSave={newList => setKeyItemList(section, newList)}
-                  onClose={() => setManagingList(null)}
-                />
-              )}
-              {addingTo === section && (
-                <AddKeyForm section={section} itemList={itemList} onAdd={item => { addKey(item); setAddingTo(null); }} onClose={() => setAddingTo(null)} />
-              )}
-            </div>
+            )}
           </div>
         );
       })}

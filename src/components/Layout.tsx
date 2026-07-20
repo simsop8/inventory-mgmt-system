@@ -6,7 +6,6 @@ import { listCloudFiles, upsertCloudFile, deleteCloudFile, renameCloudFile, type
 import { listStaff, addStaff, removeStaff, isStaffAdmin, type StaffEntry } from '../store/staffAccess';
 import { listMyShares, addShare, removeShare, type ShareEntry } from '../store/fileShares';
 import { shareOrDownload, buildPropertyLabel } from '../utils/share';
-import { buildInventoryReportPDF, buildConditionReportPDF } from '../utils/reports';
 import { agentLabel } from '../types';
 
 // A row in the "Saved Files" list, merged from the local IndexedDB library and
@@ -49,7 +48,7 @@ const tabs = [
   { id: 'property', label: 'Property' },
   { id: 'rooms', label: 'Rooms' },
   { id: 'keys', label: 'Keys & Others' },
-  { id: 'report', label: 'Report' },
+  { id: 'report', label: 'Inventory Report' },
   { id: 'condition', label: 'Condition Report' },
   { id: 'takeover', label: 'End of Lease Takeover' },
 ];
@@ -108,9 +107,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
   const [mergedFiles, setMergedFiles] = useState<MergedFileEntry[]>([]);
   const [backingUp, setBackingUp] = useState(false);
   const [syncingToCloud, setSyncingToCloud] = useState(false);
+  const [syncingEntryKey, setSyncingEntryKey] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [generatingReport, setGeneratingReport] = useState(false);
-  const [reportPreview, setReportPreview] = useState<{ url: string; filename: string; blob: Blob } | null>(null);
   const [accountDialogOpen, setAccountDialogOpen] = useState(false);
   const [authSubmitting, setAuthSubmitting] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -294,48 +292,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
     }
   };
 
-  // These live in the header menu (not just the Report/Condition Report tabs) so a report
-  // can be generated from wherever you are, without switching tabs first. Like both tabs'
-  // own "Generate" buttons, this opens an in-app preview rather than immediately sharing/
-  // downloading — a deliberate review step before anything leaves the app on iPhone/iPad.
-  // The preview's own "Download / Share" button is what actually hands the file off.
-  const handleGenerateInventoryReport = async () => {
-    setGeneratingReport(true);
-    try {
-      const { blob, filename } = await buildInventoryReportPDF(profile);
-      const url = URL.createObjectURL(blob);
-      setReportPreview(prev => { if (prev) URL.revokeObjectURL(prev.url); return { url, filename, blob }; });
-    } catch {
-      showToast("Couldn't generate the Inventory Report");
-    } finally {
-      setGeneratingReport(false);
-    }
-  };
-
-  const handleGenerateConditionReport = async () => {
-    if (profile.photos.length === 0) { showToast('No condition photos to include yet'); return; }
-    setGeneratingReport(true);
-    try {
-      const result = await buildConditionReportPDF(profile);
-      if (!result) { showToast('No condition photos to include yet'); return; }
-      const url = URL.createObjectURL(result.blob);
-      setReportPreview(prev => { if (prev) URL.revokeObjectURL(prev.url); return { url, filename: result.filename, blob: result.blob }; });
-    } catch {
-      showToast("Couldn't generate the Condition Report");
-    } finally {
-      setGeneratingReport(false);
-    }
-  };
-
-  const closeReportPreview = () => {
-    setReportPreview(prev => { if (prev) URL.revokeObjectURL(prev.url); return null; });
-  };
-
-  const downloadReportPreview = async () => {
-    if (!reportPreview) return;
-    await shareOrDownload(reportPreview.blob, reportPreview.filename, 'application/pdf');
-  };
-
   const handleSignOut = async () => {
     await signOut();
     setAccountDialogOpen(false);
@@ -410,6 +366,23 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
       void refreshSavedFiles();
     } finally {
       setSyncingToCloud(false);
+    }
+  };
+
+  // Pushes just one Saved Files entry up to the cloud — the one-off counterpart to
+  // "Sync to Cloud" for when only a single file's status light is red. Needs the entry's
+  // local copy (json) since that's the freshest thing worth pushing.
+  const syncEntryToCloud = async (entry: MergedFileEntry) => {
+    if (!cloudSyncEnabled || !session || !entry.local) return;
+    setSyncingEntryKey(entry.key);
+    try {
+      await upsertCloudFile(entry.local.filename, entry.local.json);
+      showToast(`Synced ${entry.filename} to cloud`);
+      void refreshSavedFiles();
+    } catch {
+      showToast(`Couldn't sync ${entry.filename} — offline?`);
+    } finally {
+      setSyncingEntryKey(null);
     }
   };
 
@@ -703,22 +676,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
         </div>
       )}
 
-      {reportPreview && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-black/60">
-          <div className="bg-white px-4 py-3 shadow">
-            <div className="flex items-center justify-between gap-2">
-              <span className="font-semibold text-gray-900 text-base truncate">Report Preview</span>
-              <div className="flex items-center gap-2 shrink-0">
-                <button onClick={() => { void downloadReportPreview(); }} className="px-3 py-1.5 text-base font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700">Download / Share</button>
-                <button onClick={closeReportPreview} aria-label="Close preview" className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-gray-700 text-xl leading-none">✕</button>
-              </div>
-            </div>
-            <p className="text-sm text-gray-600 mt-1">If the preview doesn't display on your device, tap Download / Share to open it directly.</p>
-          </div>
-          <iframe title="Report Preview" src={reportPreview.url} className="flex-1 w-full bg-gray-100" />
-        </div>
-      )}
-
       {saveDialogOpen && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40" onClick={() => setSaveDialogOpen(false)}>
           <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
@@ -844,9 +801,29 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
                         </p>
                         <p className="text-sm text-gray-600">
                           {new Date(entry.savedAt).toLocaleString()}
-                          {entry.cloud && <span className="ml-1.5 text-primary-600">· synced</span>}
                           {sharedByOther && <span className="ml-1.5 text-amber-600">· shared by {entry.cloud!.ownerEmail}</span>}
                         </p>
+                        {cloudSyncEnabled && (
+                          <div className="flex items-center gap-3 mt-1">
+                            <span className="flex items-center gap-1 text-xs text-gray-600" title={entry.local ? 'Saved on this device' : "Not saved on this device — hit Load to pull a local copy"}>
+                              <span className={`w-2 h-2 rounded-full ${entry.local ? 'bg-green-500' : 'bg-red-500'}`} />
+                              Saved
+                            </span>
+                            <span className="flex items-center gap-1 text-xs text-gray-600" title={entry.cloud ? 'Synced to the cloud' : 'Not synced to the cloud yet'}>
+                              <span className={`w-2 h-2 rounded-full ${entry.cloud ? 'bg-green-500' : 'bg-red-500'}`} />
+                              Synced
+                            </span>
+                            {!entry.cloud && entry.local && session && (
+                              <button
+                                onClick={() => { void syncEntryToCloud(entry); }}
+                                disabled={syncingEntryKey === entry.key}
+                                className="text-xs font-medium text-primary-600 hover:text-primary-700 underline disabled:opacity-50"
+                              >
+                                {syncingEntryKey === entry.key ? 'Syncing…' : 'Sync now'}
+                              </button>
+                            )}
+                          </div>
+                        )}
                         <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                           <button
                             onClick={() => handleLoadMerged(entry)}
@@ -1125,22 +1102,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
                   {syncingToCloud ? 'Syncing…' : '☁ Sync to Cloud'}
                 </button>
               )}
-              <button
-                onClick={() => { void handleGenerateInventoryReport(); }}
-                disabled={generatingReport}
-                className="px-3 py-1.5 text-base text-gray-700 bg-white border border-gray-400 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-                title="Generate the Property Inventory Report PDF from wherever you are"
-              >
-                Inventory Report
-              </button>
-              <button
-                onClick={() => { void handleGenerateConditionReport(); }}
-                disabled={generatingReport}
-                className="px-3 py-1.5 text-base text-gray-700 bg-white border border-gray-400 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-                title="Generate the Property Condition Report PDF from wherever you are"
-              >
-                Condition Report
-              </button>
               <div className="w-px h-6 bg-gray-300 mx-1" />
               <button
                 onClick={openSavedFiles}
@@ -1210,19 +1171,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
                         {syncingToCloud ? '☁ Syncing…' : '☁ Sync to Cloud'}
                       </button>
                     )}
-                    <div className="my-1 border-t border-gray-300" />
-                    <button
-                      onClick={() => { setMenuOpen(false); void handleGenerateInventoryReport(); }}
-                      className="w-full text-left px-4 py-2.5 text-base text-gray-800 hover:bg-gray-50 transition-colors"
-                    >
-                      📄 Inventory Report
-                    </button>
-                    <button
-                      onClick={() => { setMenuOpen(false); void handleGenerateConditionReport(); }}
-                      className="w-full text-left px-4 py-2.5 text-base text-gray-800 hover:bg-gray-50 transition-colors"
-                    >
-                      📄 Condition Report
-                    </button>
                     <div className="my-1 border-t border-gray-300" />
                     <button
                       onClick={() => { setMenuOpen(false); openSavedFiles(); }}

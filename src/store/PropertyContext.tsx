@@ -1,34 +1,21 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import type { PropertyProfile, PropertyDetails, Room, InventoryItem, KeyItem, Photo, Signature, Person, AgentInfo, TakeoverData } from '../types';
 import { createEmptyProfile, createEmptyTakeover, DEFAULT_KEY_ITEM_LISTS } from '../types';
+import { loadCurrentProfile, saveCurrentProfile, clearCurrentProfile } from './currentProfileStore';
 
-const STORAGE_KEY = 'property-inventory-profile';
+// Read once on first load, for anyone whose live session predates the move to
+// IndexedDB (see currentProfileStore.ts) — then this key is cleared and never touched
+// again. localStorage's small per-origin quota is exactly what caused photos to
+// disappear on reload in the first place, so this is a one-time migration path only,
+// never a fallback to write back to.
+const LEGACY_STORAGE_KEY = 'property-inventory-profile';
 
-function loadFromStorage(): PropertyProfile {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return createEmptyProfile();
-    const parsed = JSON.parse(raw) as PropertyProfile;
-    if (parsed?.id && parsed?.details) {
-      // Backward compat: older auto-saves predate the Takeover feature.
-      if (!parsed.takeover) parsed.takeover = createEmptyTakeover();
-      return parsed;
-    }
-  } catch { /* ignore */ }
-  return createEmptyProfile();
-}
-
-function saveToStorage(profile: PropertyProfile) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
-  } catch (e) {
-    // Storage full (likely large photos) — save without photo data as fallback
-    try {
-      const slim = { ...profile, photos: [] };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(slim));
-      console.warn('Auto-save: photos omitted due to storage limit. Use "Save Work" to export the full profile.');
-    } catch { /* ignore */ }
-  }
+function normalizeLoadedProfile(parsed: unknown): PropertyProfile | null {
+  const p = parsed as PropertyProfile | null;
+  if (!p?.id || !p?.details) return null;
+  // Backward compat: older auto-saves predate the Takeover feature.
+  if (!p.takeover) p.takeover = createEmptyTakeover();
+  return p;
 }
 
 interface PropertyContextType {
@@ -82,11 +69,43 @@ interface PropertyContextType {
 const PropertyContext = createContext<PropertyContextType | null>(null);
 
 export const PropertyProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [profile, setProfile] = useState<PropertyProfile>(loadFromStorage);
+  const [profile, setProfile] = useState<PropertyProfile>(createEmptyProfile);
+  // Guards the auto-save effect below from firing (and stomping IndexedDB with an empty
+  // profile) before the async load on mount has actually resolved.
+  const [loaded, setLoaded] = useState(false);
   const t = (p: PropertyProfile): PropertyProfile => ({ ...p, updatedAt: new Date().toISOString() });
 
-  // Auto-save to localStorage on every change
-  useEffect(() => { saveToStorage(profile); }, [profile]);
+  // Load the live session on mount: IndexedDB first, falling back to (and then clearing)
+  // the old localStorage key for anyone whose last session predates this migration.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const fromIndexedDb = normalizeLoadedProfile(await loadCurrentProfile());
+      if (cancelled) return;
+      if (fromIndexedDb) {
+        setProfile(fromIndexedDb);
+        setLoaded(true);
+        return;
+      }
+      try {
+        const raw = localStorage.getItem(LEGACY_STORAGE_KEY);
+        const legacy = raw ? normalizeLoadedProfile(JSON.parse(raw)) : null;
+        if (!cancelled && legacy) setProfile(legacy);
+      } catch { /* ignore */ }
+      localStorage.removeItem(LEGACY_STORAGE_KEY);
+      if (!cancelled) setLoaded(true);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Auto-save to IndexedDB on every change, once the initial load has finished (so this
+  // doesn't fire for the placeholder empty profile before real data is in and overwrite
+  // it). Best-effort: a failed write here shouldn't crash the app — "Save Work" is still
+  // there as the explicit, durable save.
+  useEffect(() => {
+    if (!loaded) return;
+    void saveCurrentProfile(profile).catch(() => { /* ignore — best-effort live autosave */ });
+  }, [profile, loaded]);
 
   const updateDetails = useCallback((d: Partial<PropertyDetails>) =>
     setProfile(p => t({ ...p, details: { ...p.details, ...d } })), []);
@@ -260,7 +279,7 @@ export const PropertyProvider: React.FC<{ children: ReactNode }> = ({ children }
     } catch { return false; }
   }, []);
   const resetProfile = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEY);
+    void clearCurrentProfile().catch(() => { /* ignore */ });
     setProfile(createEmptyProfile());
   }, []);
 

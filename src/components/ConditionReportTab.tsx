@@ -6,22 +6,32 @@ import { normalizeImageOrientation } from '../utils/image';
 import { shareOrDownload, buildReportFilename, buildPropertyLabel } from '../utils/share';
 import { buildConditionReportPDF } from '../utils/reports';
 import { buildConditionReportExport, parseConditionReportImport, exchangeToPhotos } from '../utils/conditionReportExchange';
+import { useDragReorder } from '../utils/dragReorder';
 
 // Note: this tab is intentionally independent of the move-in inventory's lock/signature
 // cycle (see isLocked in PropertyContext). Tenants get a warranty period after handover
 // to report defects, so this log needs to stay editable indefinitely — signing the
 // move-in inventory or the Takeover form never disables anything here.
 export const ConditionReportTab: React.FC = () => {
-  const { profile, addPhoto, addPhotos, updatePhoto, deletePhoto } = useProperty();
+  const { profile, addPhoto, addPhotos, updatePhoto, deletePhoto, reorderRoomTo } = useProperty();
   const fileRef = useRef<HTMLInputElement>(null);
   const camRef = useRef<HTMLInputElement>(null);
   const exchangeFileRef = useRef<HTMLInputElement>(null);
+  const rowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
+  // Sorted explicitly by the Rooms tab's own `order` field, so this tab's grouping always
+  // matches the Rooms tab's sequence regardless of how the underlying array happens to be
+  // ordered. Only these (real Room entities) can be drag-reordered — Others/General/custom
+  // areas below aren't rooms, so there's no "order" for them to slot into.
+  const orderedRooms = [...profile.rooms].sort((a, b) => a.order - b.order);
+  const roomAreaNames = orderedRooms.map(r => r.name);
   // Built-in areas + any custom area names already used on past photos (so a custom
   // area you typed once shows back up in the picker without retyping it).
-  const builtInAreas = [...profile.rooms.map(r => r.name), OTHERS_AREA_LABEL, GENERAL_AREA_LABEL];
+  const builtInAreas = [...roomAreaNames, OTHERS_AREA_LABEL, GENERAL_AREA_LABEL];
   const usedCustomAreas = [...new Set(profile.photos.map(p => p.area || GENERAL_AREA_LABEL))].filter(a => !builtInAreas.includes(a));
   const areaOptions = [...builtInAreas, ...usedCustomAreas];
+  // Non-room areas render after the rooms, in this fixed order, and aren't draggable.
+  const extraAreas = [OTHERS_AREA_LABEL, GENERAL_AREA_LABEL, ...usedCustomAreas];
 
   // Persisted separately from the profile so a background/reload mid-capture (a known
   // iOS Safari quirk after using the native camera) restores the last-picked area
@@ -40,9 +50,11 @@ export const ConditionReportTab: React.FC = () => {
   const [preview, setPreview] = useState<{ url: string; filename: string; blob: Blob } | null>(null);
   // Which photos are checked for bulk delete — keyed by Photo.id, across all areas.
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<Set<string>>(new Set());
-  // Which area sections are collapsed — keyed by area name. Areas start expanded;
-  // collapsing one just hides its photo grid so a long room list is easier to scan.
-  const [collapsedAreas, setCollapsedAreas] = useState<Set<string>>(new Set());
+  // Which area sections are collapsed — keyed by area name. Areas start collapsed (every
+  // area present at mount is seeded in here) so a long room list opens as a scannable
+  // list of headers; a newly-added area afterwards defaults to expanded since it's new
+  // and won't be in this initial set.
+  const [collapsedAreas, setCollapsedAreas] = useState<Set<string>>(() => new Set(areaOptions));
   const toggleAreaCollapsed = (area: string) => {
     setCollapsedAreas(prev => {
       const next = new Set(prev);
@@ -51,6 +63,11 @@ export const ConditionReportTab: React.FC = () => {
       return next;
     });
   };
+
+  // Drag-to-reorder for room sections — same press-and-slide gesture as the Rooms tab,
+  // committing straight to the shared room order (reorderRoomTo) so Rooms, Inventory
+  // Report, and this tab always stay in sync.
+  const { dragId, startDrag, getRowStyle } = useDragReorder(orderedRooms.length, reorderRoomTo);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 2500); };
 
@@ -177,10 +194,6 @@ export const ConditionReportTab: React.FC = () => {
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
   };
 
-  // Group existing photos by area for display/PDF — built-in areas in a fixed order,
-  // followed by any custom area names already in use.
-  const orderedAreas = areaOptions;
-
   const generateConditionReportPDF = async () => {
     if (profile.photos.length === 0) { showToast('No photos to include yet'); return; }
     setGenerating(true);
@@ -305,61 +318,90 @@ export const ConditionReportTab: React.FC = () => {
               </button>
             </div>
           </div>
-          {orderedAreas.map(area => {
-            const areaPhotos = profile.photos.filter(p => (p.area || GENERAL_AREA_LABEL) === area);
-            if (areaPhotos.length === 0) return null;
-            const isCollapsed = collapsedAreas.has(area);
-            return (
-              <div key={area} className="bg-white rounded-lg shadow overflow-hidden">
-                <button
-                  onClick={() => toggleAreaCollapsed(area)}
-                  aria-expanded={!isCollapsed}
-                  className="w-full flex items-center gap-2 px-4 py-3 bg-gray-50 border-b border-gray-300 hover:bg-gray-100 transition-colors text-left"
+          {(() => {
+            const renderAreaCard = (area: string, drag?: { roomId: string; index: number }) => {
+              const areaPhotos = profile.photos.filter(p => (p.area || GENERAL_AREA_LABEL) === area);
+              if (areaPhotos.length === 0) return null;
+              const isCollapsed = collapsedAreas.has(area);
+              return (
+                <div
+                  key={area}
+                  ref={drag ? (el => { if (el) rowRefs.current.set(drag.roomId, el); else rowRefs.current.delete(drag.roomId); }) : undefined}
+                  className="bg-white rounded-lg shadow overflow-hidden"
+                  style={drag ? getRowStyle(drag.roomId, drag.index) : undefined}
                 >
-                  <span className="text-gray-500 text-sm shrink-0">{isCollapsed ? '▶' : '▼'}</span>
-                  <span className="font-semibold text-gray-900">{area}</span>
-                  <span className="text-sm text-gray-600 bg-gray-200 px-2 py-0.5 rounded-full">{areaPhotos.length} photo{areaPhotos.length !== 1 ? 's' : ''}</span>
-                </button>
-                {!isCollapsed && (
-                <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {areaPhotos.map((photo, photoIdx) => (
-                    <div key={photo.id} className={`border rounded-lg overflow-hidden ${selectedPhotoIds.has(photo.id) ? 'border-primary-400 ring-2 ring-primary-200' : 'border-gray-300'}`}>
-                      {/* object-contain (not cover) so tall screenshots/portrait photos show in full
-                          instead of having their top/bottom cropped off to fill a fixed 16:9 box. */}
-                      <div className="relative aspect-video bg-gray-100">
-                        <img src={photo.dataUrl} alt={photo.caption || area} className="w-full h-full object-contain" />
-                        <label className="absolute top-2 left-2 flex items-center justify-center w-6 h-6 bg-white/90 rounded shadow cursor-pointer">
-                          <input type="checkbox" checked={selectedPhotoIds.has(photo.id)} onChange={() => togglePhotoSelection(photo.id)} />
-                        </label>
-                      </div>
-                      <div className="p-2.5 space-y-2">
-                        <select
-                          value={area}
-                          onChange={e => updatePhoto(photo.id, { area: e.target.value })}
-                          className="w-full border border-gray-300 rounded px-2 py-1 text-sm bg-gray-50 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                        >
-                          {[...new Set([...areaOptions, area])].map(a => <option key={a} value={a}>{a}</option>)}
-                        </select>
-                        <textarea
-                          value={photo.caption || ''}
-                          onChange={e => updatePhoto(photo.id, { caption: e.target.value })}
-                          placeholder="Remarks — e.g. scratch on wall, working condition..."
-                          rows={2}
-                          className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 resize-y"
-                        />
-                        <p className="text-sm text-gray-600">{new Date(photo.dateAdded).toLocaleString()}</p>
-                        <div className="flex gap-2">
-                          <button onClick={() => handleDownload(photo, area, photoIdx)} className="flex-1 text-sm px-2 py-1 text-gray-700 bg-gray-100 rounded hover:bg-gray-200">Download</button>
-                          <button onClick={() => { if (confirm('Delete this photo?')) deletePhoto(photo.id); }} className="flex-1 text-sm px-2 py-1 text-red-600 bg-red-50 rounded hover:bg-red-100">Delete</button>
+                  <div className="flex items-center gap-1 px-2 py-2 bg-gray-50 border-b border-gray-300">
+                    {drag && (
+                      <button
+                        type="button"
+                        onPointerDown={e => {
+                          setCollapsedAreas(new Set(areaOptions)); // collapse everyone first so every row shares one height during the drag
+                          startDrag(e, drag.roomId, drag.index, rowRefs.current.get(drag.roomId) || null);
+                        }}
+                        className={`w-8 h-8 flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-200 rounded touch-none ${dragId === drag.roomId ? 'cursor-grabbing text-primary-600 bg-gray-200' : 'cursor-grab'}`}
+                        title="Press and drag to reorder"
+                        aria-label="Drag to reorder room"
+                      >
+                        <span className="text-xl leading-none select-none">⠿</span>
+                      </button>
+                    )}
+                    <button
+                      onClick={() => toggleAreaCollapsed(area)}
+                      aria-expanded={!isCollapsed}
+                      className="flex-1 flex items-center gap-2 px-2 py-1 hover:bg-gray-100 rounded transition-colors text-left"
+                    >
+                      <span className="text-gray-500 text-sm shrink-0">{isCollapsed ? '▶' : '▼'}</span>
+                      <span className="font-semibold text-gray-900">{area}</span>
+                      <span className="text-sm text-gray-600 bg-gray-200 px-2 py-0.5 rounded-full">{areaPhotos.length} photo{areaPhotos.length !== 1 ? 's' : ''}</span>
+                    </button>
+                  </div>
+                  {!isCollapsed && (
+                  <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {areaPhotos.map((photo, photoIdx) => (
+                      <div key={photo.id} className={`border rounded-lg overflow-hidden ${selectedPhotoIds.has(photo.id) ? 'border-primary-400 ring-2 ring-primary-200' : 'border-gray-300'}`}>
+                        {/* object-contain (not cover) so tall screenshots/portrait photos show in full
+                            instead of having their top/bottom cropped off to fill a fixed 16:9 box. */}
+                        <div className="relative aspect-video bg-gray-100">
+                          <img src={photo.dataUrl} alt={photo.caption || area} className="w-full h-full object-contain" />
+                          <label className="absolute top-2 left-2 flex items-center justify-center w-6 h-6 bg-white/90 rounded shadow cursor-pointer">
+                            <input type="checkbox" checked={selectedPhotoIds.has(photo.id)} onChange={() => togglePhotoSelection(photo.id)} />
+                          </label>
+                        </div>
+                        <div className="p-2.5 space-y-2">
+                          <select
+                            value={area}
+                            onChange={e => updatePhoto(photo.id, { area: e.target.value })}
+                            className="w-full border border-gray-300 rounded px-2 py-1 text-sm bg-gray-50 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                          >
+                            {[...new Set([...areaOptions, area])].map(a => <option key={a} value={a}>{a}</option>)}
+                          </select>
+                          <textarea
+                            value={photo.caption || ''}
+                            onChange={e => updatePhoto(photo.id, { caption: e.target.value })}
+                            placeholder="Remarks — e.g. scratch on wall, working condition..."
+                            rows={2}
+                            className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 resize-y"
+                          />
+                          <p className="text-sm text-gray-600">{new Date(photo.dateAdded).toLocaleString()}</p>
+                          <div className="flex gap-2">
+                            <button onClick={() => handleDownload(photo, area, photoIdx)} className="flex-1 text-sm px-2 py-1 text-gray-700 bg-gray-100 rounded hover:bg-gray-200">Download</button>
+                            <button onClick={() => { if (confirm('Delete this photo?')) deletePhoto(photo.id); }} className="flex-1 text-sm px-2 py-1 text-red-600 bg-red-50 rounded hover:bg-red-100">Delete</button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+                  )}
                 </div>
-                )}
-              </div>
+              );
+            };
+            return (
+              <>
+                {orderedRooms.map((room, ri) => renderAreaCard(room.name, { roomId: room.id, index: ri }))}
+                {extraAreas.map(area => renderAreaCard(area))}
+              </>
             );
-          })}
+          })()}
         </div>
       )}
 

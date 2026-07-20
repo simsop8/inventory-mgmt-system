@@ -7,7 +7,7 @@ import { buildInventoryReportPDF } from '../utils/reports';
 import { agentLabel } from '../types';
 
 export const ReportGenerator: React.FC = () => {
-  const { profile, isLocked, addSignature, deleteSignature, reorderRoomTo, updateItem, updateKey } = useProperty();
+  const { profile, isLocked, addSignature, deleteSignature, reorderRoomTo, updateItem, updateKey, updateDetails } = useProperty();
   const roomSeqRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const { dragId: roomSeqDragId, startDrag: startRoomSeqDrag, getRowStyle: getRoomSeqRowStyle } = useDragReorder(profile.rooms.length, reorderRoomTo);
   const [generating, setGenerating] = useState(false);
@@ -220,6 +220,21 @@ export const ReportGenerator: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Same underlying value as "Additional Notes" on the Property tab / the Keys
+          tab's Others section — surfaced here too so it isn't missed while reviewing,
+          and so it's obvious it'll appear as a "NOTES" section in the generated PDF. */}
+      <div className="bg-white rounded-lg shadow p-4">
+        <h2 className="text-lg font-semibold text-gray-900 mb-2">Additional Notes</h2>
+        <textarea
+          value={profile.details.notes || ''}
+          onChange={e => updateDetails({ notes: e.target.value })}
+          rows={4}
+          placeholder="Any additional notes..."
+          className="w-full border border-gray-400 rounded-md px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-primary-500"
+        />
+        <p className="text-sm text-gray-600 mt-2">Appears as a "NOTES" section in the PDF, right before the Acknowledgement of Condition page.</p>
+      </div>
       </fieldset>
 
       <div className="bg-white rounded-lg shadow p-4">

@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useProperty } from '../store/PropertyContext';
 import { useAuth } from '../store/AuthContext';
 import { addSavedFile, getAllSavedFiles, deleteSavedFile, renameSavedFile, type SavedFileEntry } from '../store/fileHistory';
-import { listCloudFiles, upsertCloudFile, deleteCloudFile, renameCloudFile, type CloudFileEntry } from '../store/cloudFiles';
+import { listCloudFiles, upsertCloudFile, deleteCloudFile, renameCloudFile, getCloudFileJson, type CloudFileEntry } from '../store/cloudFiles';
 import { listStaff, addStaff, removeStaff, isStaffAdmin, type StaffEntry } from '../store/staffAccess';
 import { listMyShares, addShare, removeShare, type ShareEntry } from '../store/fileShares';
 import { shareOrDownload, buildPropertyLabel } from '../utils/share';
@@ -10,12 +10,13 @@ import { agentLabel } from '../types';
 
 // A row in the "Saved Files" list, merged from the local IndexedDB library and
 // (if signed in) the cloud table — one row per filename, tracking whichever
-// local/cloud copy actually exists so Load/Delete can act on both.
+// local/cloud copy actually exists so Load/Delete can act on both. Note there's no
+// `json` here — listing files is metadata-only now (see cloudFiles.ts); use
+// resolveEntryJson() below to fetch a specific entry's actual content on demand.
 interface MergedFileEntry {
   key: string;
   filename: string;
   savedAt: string;
-  json: string;
   local?: SavedFileEntry;
   cloud?: CloudFileEntry;
 }
@@ -23,19 +24,30 @@ interface MergedFileEntry {
 function mergeFileLists(local: SavedFileEntry[], cloud: CloudFileEntry[]): MergedFileEntry[] {
   const map = new Map<string, MergedFileEntry>();
   for (const l of local) {
-    map.set(l.filename.toLowerCase(), { key: l.filename.toLowerCase(), filename: l.filename, savedAt: l.savedAt, json: l.json, local: l });
+    map.set(l.filename.toLowerCase(), { key: l.filename.toLowerCase(), filename: l.filename, savedAt: l.savedAt, local: l });
   }
   for (const c of cloud) {
     const key = c.filename.toLowerCase();
     const existing = map.get(key);
     if (existing) {
       const cloudIsNewer = new Date(c.savedAt).getTime() > new Date(existing.savedAt).getTime();
-      map.set(key, { ...existing, cloud: c, savedAt: cloudIsNewer ? c.savedAt : existing.savedAt, json: cloudIsNewer ? c.json : existing.json });
+      map.set(key, { ...existing, cloud: c, savedAt: cloudIsNewer ? c.savedAt : existing.savedAt });
     } else {
-      map.set(key, { key, filename: c.filename, savedAt: c.savedAt, json: c.json, cloud: c });
+      map.set(key, { key, filename: c.filename, savedAt: c.savedAt, cloud: c });
     }
   }
   return Array.from(map.values()).sort((a, b) => b.savedAt.localeCompare(a.savedAt));
+}
+
+// Fetches one entry's actual file content, only when something's about to use it
+// (Load / Download / Backup) — the freshest copy between local and cloud, preferring
+// local when it's not older than the cloud row (no network round-trip needed then).
+async function resolveEntryJson(entry: MergedFileEntry): Promise<string> {
+  const localIsFreshEnough = entry.local && (!entry.cloud || new Date(entry.local.savedAt) >= new Date(entry.cloud.savedAt));
+  if (localIsFreshEnough) return entry.local!.json;
+  if (entry.cloud) return getCloudFileJson(entry.cloud.id);
+  if (entry.local) return entry.local.json;
+  throw new Error('No content available for this file');
 }
 
 interface LayoutProps {
@@ -546,7 +558,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
     for (const entry of mergedFiles) {
       if (!selectedForBackup.has(entry.key)) continue;
       const filename = entry.filename.endsWith('.json') ? entry.filename : `${entry.filename}.json`;
-      files.push({ filename, json: entry.json });
+      try {
+        files.push({ filename, json: await resolveEntryJson(entry) });
+      } catch {
+        showToast(`Couldn't fetch ${entry.filename} — skipped`);
+      }
     }
     await backupFiles(files, 'property-inventory-backup-selected');
   };
@@ -594,7 +610,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
   };
 
   const handleLoadMerged = async (entry: MergedFileEntry) => {
-    const ok = importProfile(entry.json);
+    let json: string;
+    try {
+      json = await resolveEntryJson(entry);
+    } catch {
+      showToast(`Couldn't load ${entry.filename} — offline?`);
+      return;
+    }
+    const ok = importProfile(json);
     showToast(ok ? `Loaded: ${entry.filename}` : 'Invalid file — could not load');
     if (ok) {
       // Same reasoning as handleLoad: this is a different file, so drop the stale
@@ -604,7 +627,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
       // A cloud-only entry (loaded on a device that hadn't saved it locally yet) —
       // cache it locally too so it's available offline next time.
       if (!entry.local) {
-        try { await addSavedFile(entry.filename, entry.json); } catch { /* ignore */ }
+        try { await addSavedFile(entry.filename, json); } catch { /* ignore */ }
       }
       setSavedFilesOpen(false);
     }
@@ -622,7 +645,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
   // provider (via the OS share sheet on mobile) — separate from Save Work, which
   // on mobile now saves straight to the cloud without prompting for a destination.
   const handleDownloadMerged = async (entry: MergedFileEntry) => {
-    const blob = new Blob([entry.json], { type: 'application/json' });
+    let json: string;
+    try {
+      json = await resolveEntryJson(entry);
+    } catch {
+      showToast(`Couldn't download ${entry.filename} — offline?`);
+      return;
+    }
+    const blob = new Blob([json], { type: 'application/json' });
     const result = await shareOrDownload(blob, entry.filename, 'application/json');
     if (result !== 'cancelled') {
       showToast(result === 'shared' ? 'Check the destination you chose' : 'Downloaded');

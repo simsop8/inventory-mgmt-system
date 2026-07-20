@@ -8,11 +8,18 @@
 
 import { supabase } from '../lib/supabaseClient';
 
+// Deliberately excludes `json` — each row's json column holds the entire property
+// profile including every embedded photo (often several MB, sometimes 5-9MB+ for a
+// condition-report-heavy property). The Saved Files list only needs filename/timestamp/
+// ownership to render, so fetching it for every row here (as this used to do) meant every
+// list refresh silently downloaded the full content of every saved file — the actual
+// cause of the app feeling slow, and a fast way to burn through the free tier's egress
+// allowance. Use getCloudFileJson() to fetch one specific file's content on demand
+// (Load/Download/Backup), only when it's actually needed.
 export interface CloudFileEntry {
   id: string;
   filename: string;
   savedAt: string;
-  json: string;
   userId: string;
   ownerEmail: string | null;
 }
@@ -20,13 +27,20 @@ export interface CloudFileEntry {
 export async function listCloudFiles(): Promise<CloudFileEntry[]> {
   const { data, error } = await supabase
     .from('saved_files')
-    .select('id, filename, json, updated_at, user_id, owner_email')
+    .select('id, filename, updated_at, user_id, owner_email')
     .order('updated_at', { ascending: false });
   if (error) throw error;
   return (data ?? []).map(r => ({
-    id: r.id, filename: r.filename, json: r.json, savedAt: r.updated_at,
+    id: r.id, filename: r.filename, savedAt: r.updated_at,
     userId: r.user_id, ownerEmail: r.owner_email,
   }));
+}
+
+// Fetches one file's full content — the counterpart to the lean listCloudFiles() above.
+export async function getCloudFileJson(id: string): Promise<string> {
+  const { data, error } = await supabase.from('saved_files').select('json').eq('id', id).single();
+  if (error) throw error;
+  return data.json;
 }
 
 // Overwrites in place if a file with the same name (case-insensitive) already

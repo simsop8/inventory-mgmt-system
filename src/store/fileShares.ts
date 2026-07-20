@@ -12,11 +12,21 @@ export interface ShareEntry {
   createdAt: string;
 }
 
-// Shares I (the signed-in user) have granted to others.
+// Shares I (the signed-in user) have granted to others. Explicitly filtered to rows I
+// own — RLS on this table also lets a recipient read the row someone else created to
+// share with them (needed so recipients can actually access the shared files), so
+// without this filter a signed-in recipient would also see their own email show up
+// here as if they'd shared with themselves.
 export async function listMyShares(): Promise<ShareEntry[]> {
+  const { data: userData, error: userErr } = await supabase.auth.getUser();
+  if (userErr) throw userErr;
+  const user = userData.user;
+  if (!user) throw new Error('Not signed in');
+
   const { data, error } = await supabase
     .from('saved_files_shares')
     .select('id, shared_with_email, created_at')
+    .eq('owner_user_id', user.id)
     .order('created_at', { ascending: true });
   if (error) throw error;
   return (data ?? []).map(r => ({ id: r.id, sharedWithEmail: r.shared_with_email, createdAt: r.created_at }));

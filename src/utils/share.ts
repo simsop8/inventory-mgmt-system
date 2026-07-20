@@ -57,7 +57,11 @@ export function buildPropertyLabel(details: {
   postalCode?: string;
 }): string {
   if (details.propertyType === 'condo' && details.condoName) {
-    return [details.condoName, details.unitNo ? `#${details.unitNo}` : null].filter(Boolean).join('-');
+    // The Unit No. field's placeholder ("e.g. #12-34") invites typing the leading "#" in
+    // directly, but we always want exactly one "#" in the filename — so strip any the user
+    // already typed before adding ours, instead of risking a doubled "##" like "##08-03".
+    const unit = (details.unitNo || '').replace(/^#+\s*/, '').trim();
+    return [details.condoName, unit ? `#${unit}` : null].filter(Boolean).join('-');
   }
   return stripSingaporePostal(details.address, details.postalCode);
 }

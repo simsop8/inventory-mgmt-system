@@ -160,8 +160,8 @@ export const TAKEOVER_AREA_PRESETS = [
 ];
 
 export const DEFAULT_KEY_ITEM_LISTS: Record<string, string[]> = {
-  keys: ['Main Door Key', 'Gate Key', 'Bedroom Key', 'Store Room Key', 'Mailbox Key', 'Car Park Gantry Key'],
-  access_cards: ['Main Entrance', 'Carpark', 'Gym', 'Swimming Pool', 'Clubhouse', 'Management Office', 'Letterbox', 'Lift', 'Side Gate'],
+  keys: ['Main Door Key', 'Digital Lock', 'Gate Key', 'Bedroom Key', 'Master Bedroom Keys', 'Bedroom 2 Keys', 'Bedroom 3 Keys', 'Bedroom 4 Keys', 'Bedroom 5 Keys', 'Helper Room Keys', 'Store Room Key', 'Utility Room Keys', 'Mailbox Key', 'Car Park Gantry Key', 'Service Door Key', 'Window Lock Keys'],
+  access_cards: ['Main Entrance', 'Carpark', 'Resident Passes', 'Gym', 'Swimming Pool', 'Clubhouse', 'Management Office', 'Letterbox', 'Lift', 'Side Gate'],
   remote_controls: ['Air Conditioner Remote', 'TV Remote', 'Gate Remote', 'Ceiling Fan Remote', 'Alarm Fob'],
   others: ['Manual', 'Warranty Card', 'Document'],
   meter_readings: ['Electricity Meter Reading', 'Water Meter Reading', 'Gas Meter Reading'],
@@ -203,10 +203,13 @@ export function detectRoomType(name: string): string {
   if (/master\s*bed/i.test(lower)) return 'Master Bedroom';
   if (/bed/i.test(lower)) return 'Bedroom 2';
   if (/kitchen/i.test(lower)) return 'Kitchen';
+  if (/foyer/i.test(lower)) return 'Entrance Foyer';
+  if (/family|lounge/i.test(lower)) return 'Family Lounge';
   if (/living/i.test(lower)) return 'Living Room';
   if (/dining/i.test(lower)) return 'Dining Room';
   if (/study/i.test(lower)) return 'Study Room';
   if (/balcon/i.test(lower)) return 'Balcony';
+  if (/yard/i.test(lower)) return 'Yard';
   if (/store|storage/i.test(lower)) return 'Store Room';
   if (/utility/i.test(lower)) return 'Utility Room';
   if (/helper/i.test(lower)) return "Helper's Room";
@@ -246,14 +249,16 @@ export const PROPERTY_TYPES = [
 ];
 
 export const STANDARD_ROOMS = [
-  'Living Room', 'Dining Room', 'Master Bedroom', 'Bedroom 2', 'Bedroom 3',
+  'Entrance Foyer', 'Living Room', 'Family Lounge', 'Dining Room', 'Master Bedroom', 'Bedroom 2', 'Bedroom 3',
   'Bedroom 4', 'Bedroom 5', 'Master Bathroom', 'Common Bathroom', 'Kitchen',
-  'Utility Room', 'Store Room', 'Balcony', 'Study Room', "Helper's Room", 'Others',
+  'Utility Room', 'Yard', 'Store Room', 'Balcony', 'Study Room', "Helper's Room", 'Others',
 ];
 
 export const STANDARD_INVENTORY: Record<string, string[]> = {
-  'Living Room': ['Sofa', 'Armchair', 'Coffee Table', 'Side Table', 'TV Console', 'TV', 'Curtains', 'Day Sheers', 'Blinds', 'Ceiling Fan', 'Ceiling Down Lights', 'Air Conditioner', 'Carpet', 'Display Cabinet', 'Bookshelf', 'Shoe Cabinet', 'Shoe Rack'],
-  'Dining Room': ['Dining Table', 'Dining Chairs', 'Display Cabinet', 'Bar Cabinet', 'Ceiling Fan', 'Chandelier', 'Curtains', 'Cove LED Lights'],
+  'Entrance Foyer': ['Digital Lock', 'Ceiling Light', 'Cove Lighting'],
+  'Living Room': ['Sofa', 'Armchair', 'Coffee Table', 'Side Table', 'TV Console', 'TV', 'Curtains', 'Day Sheers', 'Blinds', 'Ceiling Fan', 'Ceiling Down Lights', 'Air Conditioner', 'Intercom System', 'Carpet', 'Display Cabinet', 'Bookshelf', 'Shoe Cabinet', 'Shoe Rack'],
+  'Family Lounge': ['Air Conditioner', 'Ceiling Fan'],
+  'Dining Room': ['Dining Table', 'Dining Chairs', 'Display Cabinet', 'Bar Cabinet', 'Ceiling Fan', 'Chandelier', 'Curtains', 'Day Sheers', 'Cove LED Lights'],
   'Master Bedroom': ['Bed Frame', 'Mattress', 'Headboard', 'Wardrobe', 'Dressing Table', 'Dressing Mirror', 'Bedside Table', 'Air Conditioner', 'Ceiling Fan', 'Curtains', 'Day Sheers', 'Blinds', 'Cove LED Lights', 'Study Desk', 'Study Chair', 'TV', 'TV Console'],
   'Bedroom 2': ['Bed Frame', 'Mattress', 'Wardrobe', 'Bedside Table', 'Study Desk', 'Study Chair', 'Air Conditioner', 'Ceiling Fan', 'Curtains', 'Day Sheers', 'Blinds', 'Ceiling Lights'],
   'Bedroom 3': ['Bed Frame', 'Mattress', 'Wardrobe', 'Bedside Table', 'Study Desk', 'Study Chair', 'Air Conditioner', 'Ceiling Fan', 'Curtains', 'Day Sheers', 'Blinds', 'Ceiling Lights'],
@@ -261,8 +266,9 @@ export const STANDARD_INVENTORY: Record<string, string[]> = {
   'Bedroom 5': ['Bed Frame', 'Mattress', 'Wardrobe', 'Bedside Table', 'Study Desk', 'Study Chair', 'Air Conditioner', 'Ceiling Fan', 'Curtains', 'Day Sheers', 'Blinds', 'Ceiling Lights'],
   'Master Bathroom': ['Water Heater', 'Mirror', 'Mirror Cabinet', 'Towel Rail', 'Toilet Bowl', 'Basin', 'Basin Cabinet', 'Shower Screen', 'Bathtub', 'Exhaust Fan', 'Water Cistern', 'Bidet Spray', 'Wooden Blinds'],
   'Common Bathroom': ['Water Heater', 'Mirror', 'Mirror Cabinet', 'Towel Rail', 'Toilet Bowl', 'Basin', 'Basin Cabinet', 'Shower Screen', 'Exhaust Fan', 'Water Cistern', 'Bidet Spray'],
-  'Kitchen': ['Refrigerator', 'Washing Machine', 'Dryer', 'Washer-Dryer Combo', 'Oven', 'Microwave', 'Range Hood', 'Hob', 'Stove', 'Dishwasher', 'Water Purifier', 'Kitchen Cabinet', 'Sink', 'Dish Rack'],
-  'Utility Room': ['Washing Machine', 'Dryer', 'Washer-Dryer Combo', 'Storage Cabinet', 'Shelving', 'Electrical DB Box'],
+  'Kitchen': ['Refrigerator', 'Washing Machine', 'Dryer', 'Washer-Dryer Combo', 'Oven', 'Microwave', 'Microwave & Grill', 'Range Hood', 'Hob', 'Stove', 'Dishwasher', 'Water Purifier', 'Kitchen Cabinet', 'Sink', 'Dish Rack', 'Air Conditioner'],
+  'Utility Room': ['Washing Machine', 'Dryer', 'Washer-Dryer Combo', 'Storage Cabinet', 'Shelving', 'Electrical DB Box', 'Ceiling Light'],
+  'Yard': ['Washer', 'Dryer'],
   'Store Room': ['Storage Cabinet', 'Shelving', 'Storage Rack'],
   'Balcony': ['Ceiling Fan', 'Outdoor Table', 'Outdoor Chairs', 'Clothes Rack', 'Laundry Rack'],
   'Study Room': ['Study Desk', 'Study Chair', 'Bookshelf', 'Filing Cabinet', 'Air Conditioner', 'Ceiling Fan', 'Curtains'],

@@ -512,9 +512,12 @@ export const ConditionReportTab: React.FC = () => {
                 <button onClick={closePreview} aria-label="Close preview" className="w-8 h-8 flex items-center justify-center text-gray-600 hover:text-gray-700 text-xl leading-none">✕</button>
               </div>
             </div>
-            <p className="text-sm text-gray-600 mt-1">If the preview doesn't display on your device, tap Download / Share to open it directly.</p>
+            <p className="text-sm text-gray-600 mt-1">Use "Download / Share" above for the correctly named file — your browser's own PDF viewer icons below (if shown) may save it under a random name instead.</p>
           </div>
-          <iframe title="Condition Report Preview" src={preview.url} className="flex-1 w-full bg-gray-100" />
+          {/* #toolbar=0 hides the browser's own built-in PDF viewer toolbar in browsers that
+              still honour it (steering people to the "Download / Share" button above, which is
+              the only path guaranteed to use the correct filename) — harmlessly ignored elsewhere. */}
+          <iframe title="Condition Report Preview" src={`${preview.url}#toolbar=0`} className="flex-1 w-full bg-gray-100" />
         </div>
       )}
 

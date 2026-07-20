@@ -303,9 +303,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
   };
 
   const openSaveDialog = () => {
-    // Prefill with whatever we last saved as this session (so hitting Save again is a
-    // one-click overwrite), otherwise fall back to the address-tenant default.
-    setSaveFilename(lastSavedName || buildDefaultFilename(profile));
+    // Always suggest the name the current property details compute to under the naming
+    // convention — not whatever this file happened to be called last (which matters for
+    // files loaded from an older save, an import, or a colleague's share that predates
+    // the convention, or that just have a different tenant/unit filled in now). If nothing
+    // about the property has changed since the last save, this naturally comes out
+    // identical to lastSavedName anyway, so the one-click "Save again = overwrite" flow
+    // for repeat saves of the same property is unaffected.
+    setSaveFilename(buildDefaultFilename(profile));
     setSaveDialogOpen(true);
   };
 
@@ -803,27 +808,34 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
                           {new Date(entry.savedAt).toLocaleString()}
                           {sharedByOther && <span className="ml-1.5 text-amber-600">· shared by {entry.cloud!.ownerEmail}</span>}
                         </p>
-                        {cloudSyncEnabled && (
+                        {cloudSyncEnabled && (() => {
+                          // "Synced" means there's a cloud copy AND it's not older than what's saved
+                          // locally — a cloud row alone isn't enough if the local save has since moved
+                          // on (e.g. an earlier background sync failed while offline).
+                          const isStale = !!entry.local && !!entry.cloud && new Date(entry.local.savedAt) > new Date(entry.cloud.savedAt);
+                          const isSynced = !!entry.cloud && !isStale;
+                          return (
                           <div className="flex items-center gap-3 mt-1">
                             <span className="flex items-center gap-1 text-xs text-gray-600" title={entry.local ? 'Saved on this device' : "Not saved on this device — hit Load to pull a local copy"}>
                               <span className={`w-2 h-2 rounded-full ${entry.local ? 'bg-green-500' : 'bg-red-500'}`} />
                               Saved
                             </span>
-                            <span className="flex items-center gap-1 text-xs text-gray-600" title={entry.cloud ? 'Synced to the cloud' : 'Not synced to the cloud yet'}>
-                              <span className={`w-2 h-2 rounded-full ${entry.cloud ? 'bg-green-500' : 'bg-red-500'}`} />
+                            <span className="flex items-center gap-1 text-xs text-gray-600" title={isSynced ? 'Synced to the cloud' : isStale ? 'Cloud copy is out of date' : 'Not synced to the cloud yet'}>
+                              <span className={`w-2 h-2 rounded-full ${isSynced ? 'bg-green-500' : 'bg-red-500'}`} />
                               Synced
                             </span>
-                            {!entry.cloud && entry.local && session && (
+                            {entry.local && session && (
                               <button
                                 onClick={() => { void syncEntryToCloud(entry); }}
                                 disabled={syncingEntryKey === entry.key}
-                                className="text-xs font-medium text-primary-600 hover:text-primary-700 underline disabled:opacity-50"
+                                className={`text-xs font-medium underline disabled:opacity-50 ${isSynced ? 'text-gray-500 hover:text-gray-700' : 'text-primary-600 hover:text-primary-700'}`}
                               >
-                                {syncingEntryKey === entry.key ? 'Syncing…' : 'Sync now'}
+                                {syncingEntryKey === entry.key ? 'Syncing…' : isSynced ? 'Re-sync' : 'Sync now'}
                               </button>
                             )}
                           </div>
-                        )}
+                          );
+                        })()}
                         <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                           <button
                             onClick={() => handleLoadMerged(entry)}
@@ -1075,8 +1087,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
           <div className="flex justify-between items-center py-4">
             <div className="min-w-0">
               <h1 className="text-xl font-bold text-gray-900">Property Inventory Handover</h1>
-              <p className="text-sm text-gray-600 truncate max-w-[50vw] sm:max-w-xs" title={lastSavedName ? `${lastSavedName}.json` : undefined}>
-                {lastSavedName ? `📄 ${lastSavedName}.json` : 'Unsaved — not yet saved'}
+              <p className="text-sm text-gray-600 truncate max-w-[60vw] sm:max-w-sm" title={lastSavedName ? `${lastSavedName}.json` : undefined}>
+                {lastSavedName ? `📄 ${lastSavedName}` : 'Unsaved — not yet saved'}
               </p>
             </div>
 

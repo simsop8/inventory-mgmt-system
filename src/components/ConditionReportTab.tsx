@@ -86,12 +86,18 @@ export const ConditionReportTab: React.FC = () => {
     showToast(`Zipping ${selected.length} photo${selected.length === 1 ? '' : 's'}…`);
     const { default: JSZip } = await import('jszip');
     const zip = new JSZip();
-    selected.forEach((photo, i) => {
+    // Sequential per-area numbering (Powder Bathroom-01, -02, ...) guarantees unique
+    // names within the zip without falling back to the photo's random internal ID.
+    const areaCounts = new Map<string, number>();
+    selected.forEach(photo => {
       const m = /^data:image\/(\w+);base64,(.*)$/.exec(photo.dataUrl);
       const ext = (m?.[1] || 'jpg').toLowerCase();
       const base64 = m?.[2] ?? photo.dataUrl.split(',')[1] ?? '';
-      const area = (photo.area || GENERAL_AREA_LABEL).replace(/[^\w\- ]/g, '').trim() || 'photo';
-      zip.file(`${area}-${String(i + 1).padStart(2, '0')}-${photo.id.slice(0, 8)}.${ext === 'jpeg' ? 'jpg' : ext}`, base64, { base64: true });
+      const area = photo.area || GENERAL_AREA_LABEL;
+      const seq = (areaCounts.get(area) || 0) + 1;
+      areaCounts.set(area, seq);
+      const filename = buildReportFilename([area, `Photo ${seq}`], ext === 'jpeg' ? 'jpg' : ext);
+      zip.file(filename, base64, { base64: true });
     });
     const blob = await zip.generateAsync({ type: 'blob' });
     await shareOrDownload(blob, `condition-photos-${new Date().toISOString().slice(0, 10)}.zip`, 'application/zip');
@@ -159,9 +165,15 @@ export const ConditionReportTab: React.FC = () => {
     showToast(`Added to ${area} — snap another, or switch area above`);
   };
 
-  const handleDownload = (photo: Photo) => {
+  // Filename follows the same "area-sequence" convention as the zip download below —
+  // no random photo ID, so what you get in your downloads folder actually reads as a
+  // real name instead of "photo-a1b2c3d4.jpg".
+  const handleDownload = (photo: Photo, area: string, indexInArea: number) => {
+    const m = /^data:image\/(\w+);base64,/.exec(photo.dataUrl);
+    const ext = (m?.[1] || 'jpg').toLowerCase();
+    const filename = buildReportFilename([area, `Photo ${indexInArea + 1}`], ext === 'jpeg' ? 'jpg' : ext);
     const a = document.createElement('a');
-    a.href = photo.dataUrl; a.download = `photo-${photo.id.slice(0, 8)}.jpg`;
+    a.href = photo.dataUrl; a.download = filename;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
   };
 
@@ -310,7 +322,7 @@ export const ConditionReportTab: React.FC = () => {
                 </button>
                 {!isCollapsed && (
                 <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {areaPhotos.map(photo => (
+                  {areaPhotos.map((photo, photoIdx) => (
                     <div key={photo.id} className={`border rounded-lg overflow-hidden ${selectedPhotoIds.has(photo.id) ? 'border-primary-400 ring-2 ring-primary-200' : 'border-gray-300'}`}>
                       {/* object-contain (not cover) so tall screenshots/portrait photos show in full
                           instead of having their top/bottom cropped off to fill a fixed 16:9 box. */}
@@ -337,7 +349,7 @@ export const ConditionReportTab: React.FC = () => {
                         />
                         <p className="text-sm text-gray-600">{new Date(photo.dateAdded).toLocaleString()}</p>
                         <div className="flex gap-2">
-                          <button onClick={() => handleDownload(photo)} className="flex-1 text-sm px-2 py-1 text-gray-700 bg-gray-100 rounded hover:bg-gray-200">Download</button>
+                          <button onClick={() => handleDownload(photo, area, photoIdx)} className="flex-1 text-sm px-2 py-1 text-gray-700 bg-gray-100 rounded hover:bg-gray-200">Download</button>
                           <button onClick={() => { if (confirm('Delete this photo?')) deletePhoto(photo.id); }} className="flex-1 text-sm px-2 py-1 text-red-600 bg-red-50 rounded hover:bg-red-100">Delete</button>
                         </div>
                       </div>

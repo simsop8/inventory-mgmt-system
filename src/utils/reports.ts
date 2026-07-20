@@ -212,8 +212,20 @@ export async function buildInventoryReportPDF(profile: PropertyProfile): Promise
     });
   }
 
-  // ── Notes + Acknowledgement always start on a fresh page together ──────
-  np();
+  // ── Notes + Acknowledgement — kept together, but only pushed onto a fresh page
+  // when they genuinely won't fit in what's left on the current one. Previously this
+  // was an unconditional np(), which routinely burned an almost-empty page after a
+  // short Keys & Access section, then left Notes+Acknowledgement on another mostly
+  // empty page of their own. Estimate the combined height of the Notes text (if any),
+  // the Acknowledgement heading/paragraph, and the first row of signature boxes —
+  // only page-break if that doesn't clear the footer margin from here.
+  const sigH = 30, colGap = 6;
+  const estNotesLines = profile.details.notes ? doc.splitTextToSize(profile.details.notes, CW).length : 0;
+  const estNotesH = profile.details.notes ? (2 + 5 + estNotesLines * 5 + 6) : 0;
+  const estAckH = 4 + 6 + 5 + 8; // heading + rule + first line of the paragraph + spacing before sig boxes
+  const estSigRowH = sigH + 4; // first row of signature boxes
+  if (y + estNotesH + estAckH + estSigRowH > H - MB) np();
+  else y += 4; // breathing room after Keys & Access, matching the spacing between other sections
 
   if (profile.details.notes) {
     sf('bold', 12, 0); doc.text('NOTES', ML, y); y += 2; rule(0.5, 0); y += 5;
@@ -238,7 +250,6 @@ export async function buildInventoryReportPDF(profile: PropertyProfile): Promise
   const rightSigItems = sigRoles.filter(r =>
     r.role.startsWith('tenant_') || tenantAgents.some(a => `agent_${a._idx}` === r.role));
 
-  const sigH = 30, colGap = 6;
   const sigW = (CW - colGap) / 2;
   const lxCol = ML, rxCol = ML + sigW + colGap;
 

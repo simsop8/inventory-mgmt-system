@@ -41,7 +41,11 @@ export const ReportGenerator: React.FC = () => {
     setGenerating(true);
     try {
       const { blob, filename } = await buildInventoryReportPDF(profile);
-      const url = URL.createObjectURL(blob);
+      // Wrapping in a named File (not a bare Blob) before creating the object URL is what
+      // lets the browser's own embedded PDF viewer — the save/print icons it overlays on
+      // the iframe, separate from our "Download / Share" button below — suggest this real
+      // filename instead of the blob URL's own random UUID.
+      const url = URL.createObjectURL(new File([blob], filename, { type: 'application/pdf' }));
       setPreview(prev => { if (prev) URL.revokeObjectURL(prev.url); return { url, filename, blob }; });
     } finally {
       setGenerating(false);

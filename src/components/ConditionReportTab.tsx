@@ -231,7 +231,9 @@ export const ConditionReportTab: React.FC = () => {
       const result = await buildConditionReportPDF(profile, photosPerPage);
       if (!result) { showToast('No photos to include yet'); return; }
       const { blob, filename } = result;
-      const url = URL.createObjectURL(blob);
+      // Named File (not a bare Blob) so the browser's own embedded PDF viewer save/print
+      // icons suggest this real filename instead of the blob URL's random UUID.
+      const url = URL.createObjectURL(new File([blob], filename, { type: 'application/pdf' }));
       setPreview(prev => { if (prev) URL.revokeObjectURL(prev.url); return { url, filename, blob }; });
     } finally {
       setGenerating(false);

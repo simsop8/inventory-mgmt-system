@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useProperty } from '../store/PropertyContext';
 import type { Photo } from '../types';
 import { GENERAL_AREA_LABEL, OTHERS_AREA_LABEL } from '../types';
@@ -13,7 +13,7 @@ import { useDragReorder } from '../utils/dragReorder';
 // to report defects, so this log needs to stay editable indefinitely — signing the
 // move-in inventory or the Takeover form never disables anything here.
 export const ConditionReportTab: React.FC = () => {
-  const { profile, addPhoto, addPhotos, updatePhoto, deletePhoto, reorderRoomTo } = useProperty();
+  const { profile, addPhoto, addPhotos, updatePhoto, deletePhoto, reorderRoomTo, addRoom } = useProperty();
   const fileRef = useRef<HTMLInputElement>(null);
   const camRef = useRef<HTMLInputElement>(null);
   const exchangeFileRef = useRef<HTMLInputElement>(null);
@@ -32,6 +32,19 @@ export const ConditionReportTab: React.FC = () => {
   const areaOptions = [...builtInAreas, ...usedCustomAreas];
   // Non-room areas render after the rooms, in this fixed order, and aren't draggable.
   const extraAreas = [OTHERS_AREA_LABEL, GENERAL_AREA_LABEL, ...usedCustomAreas];
+
+  // Auto-promote custom area names (typed via "+ Add custom area…" below, e.g. "Entrance
+  // Lounge") into real Rooms — so they show up on the Rooms tab, the Inventory Report, and
+  // get the same drag-to-reorder handle as every other room here, instead of being a
+  // second-class photo tag forever. "Others"/"General" are deliberately excluded — those
+  // are fixed catch-all buckets, not rooms. Once promoted, a custom area's name matches an
+  // actual room, so it naturally drops out of usedCustomAreas and this doesn't re-fire for it.
+  const customAreasKey = usedCustomAreas.join('');
+  useEffect(() => {
+    if (!usedCustomAreas.length) return;
+    usedCustomAreas.forEach(area => addRoom(area));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customAreasKey]);
 
   // Persisted separately from the profile so a background/reload mid-capture (a known
   // iOS Safari quirk after using the native camera) restores the last-picked area

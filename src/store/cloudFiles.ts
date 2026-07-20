@@ -7,6 +7,7 @@
 // (via the org_allowed_emails allow-list), not who can see whose data.
 
 import { supabase } from '../lib/supabaseClient';
+import { dehydrateJson, hydrateJson } from './photoStorage';
 
 // Deliberately excludes `json` — each row's json column holds the entire property
 // profile including every embedded photo (often several MB, sometimes 5-9MB+ for a
@@ -37,10 +38,13 @@ export async function listCloudFiles(): Promise<CloudFileEntry[]> {
 }
 
 // Fetches one file's full content — the counterpart to the lean listCloudFiles() above.
+// Rehydrates any storage: photo references back into real dataURLs before returning, so
+// callers (importProfile, addSavedFile, the backup/download flows) always get a fully
+// self-contained profile exactly as if photos had never left the JSON at all.
 export async function getCloudFileJson(id: string): Promise<string> {
   const { data, error } = await supabase.from('saved_files').select('json').eq('id', id).single();
   if (error) throw error;
-  return data.json;
+  return hydrateJson(data.json);
 }
 
 // Overwrites in place if a file with the same name (case-insensitive) already
@@ -56,16 +60,30 @@ export async function upsertCloudFile(filename: string, json: string): Promise<v
 
   const { data: existing, error: findErr } = await supabase
     .from('saved_files')
-    .select('id')
+    .select('id, user_id')
     .ilike('filename', filename)
     .maybeSingle();
   if (findErr) throw findErr;
 
+  // Photos upload under whichever user actually owns the row — the file's original
+  // owner (matters for a file shared with you), not necessarily whoever is pushing this
+  // particular sync — so the Storage RLS policies resolve the same way the row's own
+  // RLS does. Falls back to writing the plain inline json if the photo upload step fails
+  // (offline, storage misconfigured, etc.) rather than losing the save entirely — it'll
+  // dehydrate again on the next successful sync.
+  const ownerUserId = existing?.user_id ?? user.id;
+  let payload = json;
+  try {
+    payload = await dehydrateJson(json, ownerUserId);
+  } catch {
+    /* keep the inline json as a fallback */
+  }
+
   if (existing) {
-    const { error } = await supabase.from('saved_files').update({ json }).eq('id', existing.id);
+    const { error } = await supabase.from('saved_files').update({ json: payload }).eq('id', existing.id);
     if (error) throw error;
   } else {
-    const { error } = await supabase.from('saved_files').insert({ user_id: user.id, filename, json, owner_email: user.email });
+    const { error } = await supabase.from('saved_files').insert({ user_id: user.id, filename, json: payload, owner_email: user.email });
     if (error) throw error;
   }
 }

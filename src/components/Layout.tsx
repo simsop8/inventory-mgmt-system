@@ -143,7 +143,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
   const [savedFilesOpen, setSavedFilesOpen] = useState(false);
   const [mergedFiles, setMergedFiles] = useState<MergedFileEntry[]>([]);
   const [backingUp, setBackingUp] = useState(false);
-  const [syncingToCloud, setSyncingToCloud] = useState(false);
   const [syncingEntryKey, setSyncingEntryKey] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [accountDialogOpen, setAccountDialogOpen] = useState(false);
@@ -441,33 +440,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
   const syncSuffix = (cloudOk: boolean | null) =>
     cloudOk === true ? ' · synced to cloud' : cloudOk === false ? ' · cloud sync failed (saved locally)' : '';
 
-  // Explicit, user-triggered push of every locally-saved file up to the cloud — the
-  // counterpart to local-first saving. Saves never wait on the network, so this is how
-  // you catch the cloud back up after working offline (or any time you just want to be
-  // sure everything's mirrored). Best-effort per file: one failure doesn't stop the rest.
-  const syncAllToCloud = async () => {
-    if (!cloudSyncEnabled || !session) return;
-    setSyncingToCloud(true);
-    try {
-      const local = await getAllSavedFiles();
-      if (local.length === 0) { showToast('No saved files to sync yet'); return; }
-      let ok = 0, fail = 0;
-      for (const entry of local) {
-        try { await upsertCloudFile(entry.filename, entry.json); ok++; }
-        catch { fail++; }
-      }
-      showToast(fail === 0
-        ? `Synced ${ok} file${ok === 1 ? '' : 's'} to cloud`
-        : `Synced ${ok} file${ok === 1 ? '' : 's'} · ${fail} failed (offline?)`);
-      void refreshSavedFiles();
-    } finally {
-      setSyncingToCloud(false);
-    }
-  };
-
-  // Pushes just one Saved Files entry up to the cloud — the one-off counterpart to
-  // "Sync to Cloud" for when only a single file's status light is red. Needs the entry's
-  // local copy (json) since that's the freshest thing worth pushing.
+  // Pushes just one Saved Files entry up to the cloud, on demand, when its "Synced"
+  // status light is red — the only way to push to the cloud now that there's no
+  // longer a header-level "sync everything" button. Needs the entry's local copy
+  // (json) since that's the freshest thing worth pushing.
   const syncEntryToCloud = async (entry: MergedFileEntry) => {
     if (!cloudSyncEnabled || !session || !entry.local) return;
     setSyncingEntryKey(entry.key);
@@ -1290,16 +1266,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
                   {session ? 'Account' : 'Sign In'}
                 </button>
               )}
-              {cloudSyncEnabled && session && (
-                <button
-                  onClick={() => { void syncAllToCloud(); }}
-                  disabled={syncingToCloud}
-                  className="px-3 py-1.5 text-base text-gray-700 bg-white border border-gray-400 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-                  title="Push every file saved on this device up to the cloud — saves themselves are always local-first and never wait on this"
-                >
-                  {syncingToCloud ? 'Syncing…' : '☁ Sync to Cloud'}
-                </button>
-              )}
               <div className="w-px h-6 bg-gray-300 mx-1" />
               <button
                 onClick={() => setExportDialogOpen(true)}
@@ -1365,15 +1331,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
                       >
                         <span className={`w-1.5 h-1.5 rounded-full ${session ? 'bg-green-500' : 'bg-gray-300'}`} />
                         {session ? 'Account' : 'Sign In'}
-                      </button>
-                    )}
-                    {cloudSyncEnabled && session && (
-                      <button
-                        onClick={() => { setMenuOpen(false); void syncAllToCloud(); }}
-                        disabled={syncingToCloud}
-                        className="w-full text-left px-4 py-2.5 text-base text-gray-800 hover:bg-gray-50 transition-colors disabled:opacity-50"
-                      >
-                        {syncingToCloud ? '☁ Syncing…' : '☁ Sync to Cloud'}
                       </button>
                     )}
                     <div className="my-1 border-t border-gray-300" />

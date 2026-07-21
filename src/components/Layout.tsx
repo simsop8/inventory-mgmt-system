@@ -127,6 +127,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
   const [toast, setToast] = useState<string | null>(null);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [saveFilename, setSaveFilename] = useState('');
+  // "New File" (was "Reset") — confirmation dialog offering to save first, since
+  // clearing the property is otherwise unrecoverable. When the "Save Work, then New
+  // File" path is chosen, this flag tells confirmSave() to clear the property right
+  // after a successful save; cancelling out of the Save dialog clears the flag instead.
+  const [newFileDialogOpen, setNewFileDialogOpen] = useState(false);
+  const [pendingNewFileAfterSave, setPendingNewFileAfterSave] = useState(false);
   // Single global "Export Reports" entry point — one button + a dialog to pick which
   // PDF(s), instead of the Inventory/Condition Report PDFs only being reachable from
   // their own tabs. Takeover Report isn't offered here: it needs a live signature from
@@ -321,13 +327,36 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
     }
   };
 
-  const handleReset = () => {
-    if (confirm("This will clear all data on this property — rooms, items, keys, photos, and signatures. This can't be undone, so back up first if you might need it again. Continue?")) {
-      resetProfile();
-      lastSavedHandleRef.current = null;
-      setLastSavedName(null);
-      showToast('All data cleared');
-    }
+  const openNewFileDialog = () => setNewFileDialogOpen(true);
+
+  // Actually clears the current property — shared by both paths out of the New File
+  // dialog below (direct discard, and the tail end of a successful "Save Work" first).
+  const clearForNewFile = () => {
+    resetProfile();
+    lastSavedHandleRef.current = null;
+    setLastSavedName(null);
+  };
+
+  const handleDiscardAndStartNew = () => {
+    setNewFileDialogOpen(false);
+    clearForNewFile();
+    showToast('Started a new file');
+  };
+
+  // Routes through the normal Save Work dialog first — confirmSave() checks
+  // pendingNewFileAfterSave on every successful save path and clears the property
+  // right after. Cancelling that dialog (closeSaveDialog) cancels this too.
+  const handleSaveThenNewFile = () => {
+    setNewFileDialogOpen(false);
+    setPendingNewFileAfterSave(true);
+    openSaveDialog();
+  };
+
+  // Dismisses the Save dialog without saving — also cancels any pending "New File
+  // after this save" so backing out of the save doesn't still wipe the property.
+  const closeSaveDialog = () => {
+    setSaveDialogOpen(false);
+    setPendingNewFileAfterSave(false);
   };
 
   const handleExportReports = async () => {
@@ -457,6 +486,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
     const rawName = saveFilename.trim() || `property-inventory-${todayStamp()}`;
     const finalName = rawName.endsWith('.json') ? rawName : `${rawName}.json`;
     const json = exportProfile();
+    // Captured once up front: whether this save was launched from the New File dialog's
+    // "Save Work, then New File" path, so every success branch below can clear the
+    // property right after saving. Cancelling out of any of the branches below (aborted
+    // native picker, dismissed share sheet) leaves this pending for a retry instead.
+    const startingNewFile = pendingNewFileAfterSave;
+    const newFileSuffix = startingNewFile ? ' — new file started' : '';
 
     // Signed in: local storage (IndexedDB) is the durable save and always completes
     // instantly, whether online or not — Save Work never waits on the network, so a
@@ -469,10 +504,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
       lastSavedHandleRef.current = null;
       setLastSavedName(rawName);
       setSaveDialogOpen(false);
-      showToast(`Saved: ${finalName}`);
+      showToast(`Saved: ${finalName}${newFileSuffix}`);
       void trySync(finalName, json).then(cloudOk => {
         if (cloudOk === false) showToast(`${finalName} saved locally — cloud sync failed (offline?). Try "Sync to Cloud" later.`);
       });
+      if (startingNewFile) { setPendingNewFileAfterSave(false); clearForNewFile(); }
       return;
     }
 
@@ -488,7 +524,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
         await addSavedFile(handle.name || finalName, json);
         const cloudOk = await trySync(handle.name || finalName, json);
         setSaveDialogOpen(false);
-        showToast(`Overwrote ${handle.name || finalName}${syncSuffix(cloudOk)}`);
+        showToast(`Overwrote ${handle.name || finalName}${syncSuffix(cloudOk)}${newFileSuffix}`);
+        if (startingNewFile) { setPendingNewFileAfterSave(false); clearForNewFile(); }
         return;
       } catch {
         // Handle went stale (permission revoked, file moved/deleted, etc.) — fall
@@ -513,7 +550,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
         lastSavedHandleRef.current = handle;
         setLastSavedName(rawName);
         setSaveDialogOpen(false);
-        showToast(`Saved to ${handle.name || finalName}${syncSuffix(cloudOk)}`);
+        showToast(`Saved to ${handle.name || finalName}${syncSuffix(cloudOk)}${newFileSuffix}`);
+        if (startingNewFile) { setPendingNewFileAfterSave(false); clearForNewFile(); }
         return;
       } catch (err) {
         if ((err as { name?: string })?.name === 'AbortError') return; // user cancelled the dialog
@@ -536,7 +574,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
     await addSavedFile(finalName, json);
     const cloudOk = await trySync(finalName, json);
     setSaveDialogOpen(false);
-    showToast((result === 'shared' ? 'Saved — check the destination you chose' : 'File saved to your computer') + syncSuffix(cloudOk));
+    showToast((result === 'shared' ? 'Saved — check the destination you chose' : 'File saved to your computer') + syncSuffix(cloudOk) + newFileSuffix);
+    if (startingNewFile) { setPendingNewFileAfterSave(false); clearForNewFile(); }
   };
 
   // Shared by "Backup" (everything) and "Backup Selected" (a chosen subset) —
@@ -762,11 +801,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
       )}
 
       {saveDialogOpen && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40" onClick={() => setSaveDialogOpen(false)}>
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40" onClick={closeSaveDialog}>
           <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
             <h3 className="text-base font-semibold text-gray-900 mb-1">Save Work</h3>
             <p className="text-base text-gray-700 mb-4">
-              {lastSavedName && saveFilename.trim() === lastSavedName
+              {pendingNewFileAfterSave
+                ? "This property will be cleared right after saving, ready for a new file."
+                : lastSavedName && saveFilename.trim() === lastSavedName
                 ? 'Same name as your last save — this will overwrite that file. Change the name to save a new copy instead.'
                 : 'Set a filename, then choose exactly where to save it on your computer.'}
             </p>
@@ -778,7 +819,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
                   type="text"
                   value={saveFilename}
                   onChange={e => setSaveFilename(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') confirmSave(); if (e.key === 'Escape') setSaveDialogOpen(false); }}
+                  onKeyDown={e => { if (e.key === 'Enter') confirmSave(); if (e.key === 'Escape') closeSaveDialog(); }}
                   className="flex-1 px-3 py-2 text-base focus:outline-none"
                 />
                 <span className="px-3 text-base text-gray-600 bg-gray-50 border-l border-gray-300 py-2">.json</span>
@@ -788,7 +829,29 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
               <button onClick={confirmSave} className="flex-1 py-2 text-base font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700">
                 {lastSavedName && saveFilename.trim() === lastSavedName ? 'Save (Overwrite)' : 'Choose Folder & Save'}
               </button>
-              <button onClick={() => setSaveDialogOpen(false)} className="flex-1 py-2 text-base font-medium text-gray-800 bg-white border border-gray-400 rounded-lg hover:bg-gray-50">
+              <button onClick={closeSaveDialog} className="flex-1 py-2 text-base font-medium text-gray-800 bg-white border border-gray-400 rounded-lg hover:bg-gray-50">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {newFileDialogOpen && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40" onClick={() => setNewFileDialogOpen(false)}>
+          <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
+            <h3 className="text-base font-semibold text-gray-900 mb-1">Start a New File?</h3>
+            <p className="text-base text-gray-700 mb-4">
+              This clears the current property — rooms, items, keys, photos, and signatures — to start fresh. Anything not saved first can't be recovered afterward.
+            </p>
+            <div className="flex flex-col gap-2">
+              <button onClick={handleSaveThenNewFile} className="w-full py-2 text-base font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700">
+                Save Work, Then New File
+              </button>
+              <button onClick={handleDiscardAndStartNew} className="w-full py-2 text-base font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100">
+                Start New Without Saving
+              </button>
+              <button onClick={() => setNewFileDialogOpen(false)} className="w-full py-2 text-base font-medium text-gray-800 bg-white border border-gray-400 rounded-lg hover:bg-gray-50">
                 Cancel
               </button>
             </div>
@@ -1270,11 +1333,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
                 Save Work
               </button>
               <button
-                onClick={handleReset}
-                className="px-3 py-1.5 text-base font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
-                title="Clear all data on this property — rooms, items, keys, photos, and signatures"
+                onClick={openNewFileDialog}
+                className="px-3 py-1.5 text-base font-medium text-gray-700 bg-white border border-gray-400 rounded-lg hover:bg-gray-50 transition-colors"
+                title="Start a new property — you'll be prompted to save first"
               >
-                Reset
+                New File
               </button>
             </div>
 
@@ -1341,10 +1404,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, onTabChange
                     </button>
                     <div className="my-1 border-t border-gray-300" />
                     <button
-                      onClick={() => { setMenuOpen(false); handleReset(); }}
-                      className="w-full text-left px-4 py-2.5 text-base font-medium text-red-600 hover:bg-red-50 transition-colors"
+                      onClick={() => { setMenuOpen(false); openNewFileDialog(); }}
+                      className="w-full text-left px-4 py-2.5 text-base font-medium text-gray-700 hover:bg-gray-50 transition-colors"
                     >
-                      Reset
+                      New File
                     </button>
                   </div>
                 </>

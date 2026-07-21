@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { useProperty } from '../store/PropertyContext';
 import type { InventoryItem } from '../types';
-import { STANDARD_ROOMS, STANDARD_INVENTORY, detectRoomType } from '../types';
+import { STANDARD_ROOMS, STANDARD_INVENTORY, detectRoomType, sortAlpha } from '../types';
 import { useDragReorder } from '../utils/dragReorder';
 
 // ── List manager (edit the item template for a room type) ───────────────────
@@ -31,6 +31,10 @@ const ListManager: React.FC<{
       setEditIdx(null);
     };
     const remove = (i: number) => setList(list.filter((_, j) => j !== i));
+    // Display the template alphabetically so it's easy to scan/find as it grows, while
+    // startEdit/remove still operate on the item's real index in `list` (the underlying
+    // storage order is untouched — only the on-screen order is sorted here).
+    const sortedIdx = list.map((_, i) => i).sort((a, b) => list[a].localeCompare(list[b], undefined, { sensitivity: 'base' }));
 
     return (
       <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
@@ -45,14 +49,14 @@ const ListManager: React.FC<{
           </div>
         )}
         <div className="space-y-1 max-h-48 overflow-y-auto mb-2">
-          {list.map((item, i) => (
+          {sortedIdx.map(i => (
             <div key={i} className="flex items-center gap-1">
               {editIdx === i ? (
                 <input autoFocus type="text" value={editVal} onChange={e => setEditVal(e.target.value)}
                   onBlur={commitEdit} onKeyDown={e => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditIdx(null); }}
                   className="flex-1 border border-primary-400 rounded px-2 py-0.5 text-sm focus:outline-none" />
               ) : (
-                <span className="flex-1 text-sm text-gray-800 truncate">{item}</span>
+                <span className="flex-1 text-sm text-gray-800 truncate">{list[i]}</span>
               )}
               <button onClick={() => startEdit(i)} className="text-gray-600 hover:text-primary-500 text-sm px-1" title="Rename (applies globally)">✎</button>
               <button onClick={() => remove(i)} className="text-gray-600 hover:text-red-500 text-sm px-1" title="Remove">×</button>
@@ -175,7 +179,7 @@ const AddItemForm: React.FC<{ itemList: string[]; existingItems: InventoryItem[]
       onAdd({ name, brandModel: '', quantity: undefined, remarks: undefined, photos: [] });
       setSelected(''); setCustom(''); setIsCustom(false); onClose();
     };
-    const available = itemList.filter(n => !existingItems.some(i => i.name === n));
+    const available = sortAlpha(itemList.filter(n => !existingItems.some(i => i.name === n)));
     return (
       <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
         <div className="flex gap-4 mb-2">

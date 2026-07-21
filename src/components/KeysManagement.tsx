@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useProperty } from '../store/PropertyContext';
 import type { KeyItem, KeySection } from '../types';
-import { KEY_SECTION_LABELS, SECTIONS_WITH_DROPDOWNS, DEFAULT_KEY_ITEM_LISTS } from '../types';
+import { KEY_SECTION_LABELS, SECTIONS_WITH_DROPDOWNS, DEFAULT_KEY_ITEM_LISTS, sortAlpha } from '../types';
 
 const inputCls = 'w-full border border-gray-400 rounded-md px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-primary-500';
 const SECTIONS: KeySection[] = ['keys', 'access_cards', 'remote_controls', 'others', 'meter_readings'];
@@ -20,6 +20,10 @@ const ListManager: React.FC<{ items: string[]; onSave: (items: string[]) => void
     setEditIdx(null);
   };
   const remove = (i: number) => setList(list.filter((_, j) => j !== i));
+  // Display alphabetically so it's easy to scan/find as the list grows, while
+  // startEdit/remove still operate on the item's real index in `list` (the underlying
+  // storage order is untouched — only the on-screen order is sorted here).
+  const sortedIdx = list.map((_, i) => i).sort((a, b) => list[a].localeCompare(list[b], undefined, { sensitivity: 'base' }));
 
   return (
     <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
@@ -28,14 +32,14 @@ const ListManager: React.FC<{ items: string[]; onSave: (items: string[]) => void
         <button onClick={onClose} className="text-gray-600 hover:text-gray-700 text-lg leading-none">×</button>
       </div>
       <div className="space-y-1 max-h-40 overflow-y-auto mb-2">
-        {list.map((item, i) => (
+        {sortedIdx.map(i => (
           <div key={i} className="flex items-center gap-1">
             {editIdx === i ? (
               <input autoFocus type="text" value={editVal} onChange={e => setEditVal(e.target.value)}
                 onBlur={commitEdit} onKeyDown={e => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditIdx(null); }}
                 className="flex-1 border border-primary-400 rounded px-2 py-0.5 text-sm focus:outline-none" />
             ) : (
-              <span className="flex-1 text-sm text-gray-800 truncate">{item}</span>
+              <span className="flex-1 text-sm text-gray-800 truncate">{list[i]}</span>
             )}
             <button onClick={() => startEdit(i)} className="text-gray-600 hover:text-primary-500 text-sm px-1" title="Rename">✎</button>
             <button onClick={() => remove(i)} className="text-gray-600 hover:text-red-500 text-sm px-1" title="Delete">×</button>
@@ -62,6 +66,7 @@ const KeyRow: React.FC<{ item: KeyItem; itemList: string[]; onUpdate: (u: Partia
     const [editing, setEditing] = useState(false);
     const isMeter = item.section === 'meter_readings';
     const isAccessCard = item.section === 'access_cards';
+    const sortedItemList = sortAlpha(itemList);
 
     if (!editing) {
       return (
@@ -95,12 +100,12 @@ const KeyRow: React.FC<{ item: KeyItem; itemList: string[]; onUpdate: (u: Partia
             <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
             {isMeter ? (
               <select value={item.description} onChange={e => onUpdate({ description: e.target.value })} className={inputCls}>
-                {itemList.map(t => <option key={t} value={t}>{t}</option>)}
+                {sortedItemList.map(t => <option key={t} value={t}>{t}</option>)}
                 <option value="Custom">Custom...</option>
               </select>
             ) : (
               <select value={item.description} onChange={e => onUpdate({ description: e.target.value })} className={inputCls}>
-                {itemList.map(t => <option key={t} value={t}>{t}</option>)}
+                {sortedItemList.map(t => <option key={t} value={t}>{t}</option>)}
                 <option value="">— Type custom below —</option>
               </select>
             )}
@@ -184,7 +189,7 @@ const AddKeyForm: React.FC<{ section: KeySection; itemList: string[]; onAdd: (it
             <label className="block text-sm font-medium text-gray-700 mb-1">Description *</label>
             <select value={description} onChange={e => setDescription(e.target.value)} className={inputCls}>
               <option value="">Select...</option>
-              {itemList.map(t => <option key={t} value={t}>{t}</option>)}
+              {sortAlpha(itemList).map(t => <option key={t} value={t}>{t}</option>)}
               <option value="__custom__">— Custom —</option>
             </select>
             {description === '__custom__' && (

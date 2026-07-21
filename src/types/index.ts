@@ -192,6 +192,13 @@ export function agentLabel(agent: AgentInfo | undefined, idx: number, total: num
   return total > 1 ? `Agent ${idx + 1}` : 'Agent';
 }
 
+// Case-insensitive alphabetical sort for item/key dropdown lists — used everywhere an
+// item template or key preset list is displayed, so long-running lists stay easy to scan
+// as more items get added over time, regardless of what order they were typed in.
+export function sortAlpha(list: string[]): string[] {
+  return [...list].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+}
+
 export function detectRoomType(name: string): string {
   const trimmed = name.trim();
   if (STANDARD_INVENTORY[trimmed]) return trimmed;
